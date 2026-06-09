@@ -1,0 +1,14 @@
+[Desktop Entry]
+Name=CandyTracker
+Name[zh_CN]=糖糖
+Comment=A beautiful medication kinetics tracker
+Comment[zh_CN]=一个漂亮的药物追踪器
+Exec=candytracker
+Icon=com.github.mimiaomc.candytracker
+StartupWMClass=com.github.mimiaomc.candytracker
+Terminal=false
+Type=Application
+Categories=Utility;
+Keywords=GTK;
+StartupNotify=true
+DBusActivatable=true

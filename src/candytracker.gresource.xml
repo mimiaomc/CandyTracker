@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gresources>
+  <gresource prefix="/com/github/mimiaomc/candytracker">
+    <file preprocess="xml-stripblanks">window.ui</file>
+    <file preprocess="xml-stripblanks">shortcuts-dialog.ui</file>
+
+    <file alias="icons/scalable/actions/heart-filled-symbolic.svg" preprocess="xml-stripblanks">icons/heart-filled-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">add_record_dialog.ui</file>
+    <file preprocess="xml-stripblanks">preferences_window.ui</file>
+    <file preprocess="xml-stripblanks">medication_creator_page.ui</file>
+    <file preprocess="xml-stripblanks">pk_setup_page.ui</file>
+    <file preprocess="xml-stripblanks">concentration_plot.ui</file>
+    <file>presets.json</file>
+  </gresource>
+</gresources>

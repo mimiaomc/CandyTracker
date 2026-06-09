@@ -1,0 +1,3 @@
+[D-BUS Service]
+Name=com.github.mimiaomc.candytracker
+Exec=@bindir@/candytracker --gapplication-service

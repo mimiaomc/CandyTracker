@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface>
+  <requires lib="gtk" version="4.0"/>
+  <requires lib="Adw" version="1.0"/>
+  <template class="AddRecordDialog" parent="AdwMessageDialog">
+    <property name="heading" translatable="yes">Add Record</property>
+    <property name="body" translatable="yes">Log your intake accurately:</property>
+    <property name="default-response">save</property>
+
+    <responses>
+      <response id="cancel" translatable="yes">Cancel</response>
+      <response id="save" translatable="yes" appearance="suggested">Save</response>
+    </responses>
+
+    <property name="extra-child">
+      <object class="GtkBox">
+        <property name="orientation">vertical</property>
+        <property name="spacing">12</property>
+
+        <child>
+          <object class="GtkBox">
+            <property name="orientation">horizontal</property>
+            <property name="spacing">8</property>
+            <child>
+              <object class="GtkDropDown" id="med_dropdown">
+                <property name="hexpand">True</property>
+              </object>
+            </child>
+            <child>
+              <object class="GtkDropDown" id="method_dropdown">
+                <property name="tooltip-text" translatable="yes">Administration Route</property>
+              </object>
+            </child>
+          </object>
+        </child>
+
+        <child>
+          <object class="GtkBox">
+            <property name="orientation">horizontal</property>
+            <property name="spacing">8</property>
+            <child>
+              <object class="GtkSpinButton" id="dose_spin">
+                <property name="hexpand">True</property>
+                <property name="digits">2</property>
+                <property name="numeric">True</property>
+                <property name="adjustment">
+                  <object class="GtkAdjustment">
+                    <property name="value">2.0</property>
+                    <property name="lower">0.01</property>
+                    <property name="upper">5000.0</property>
+                    <property name="step-increment">0.5</property>
+                  </object>
+                </property>
+              </object>
+            </child>
+            <child>
+              <object class="GtkDropDown" id="unit_dropdown"/>
+            </child>
+          </object>
+        </child>
+
+        <child>
+          <object class="GtkBox">
+            <property name="orientation">horizontal</property>
+            <property name="spacing">6</property>
+            <child>
+              <object class="GtkMenuButton" id="date_button">
+                <property name="hexpand">True</property>
+                <property name="icon-name">pan-down-symbolic</property>
+                <property name="always-show-arrow">True</property>
+                <property name="popover">
+                  <object class="GtkPopover" id="calendar_popover">
+                    <property name="child">
+                      <object class="GtkBox" id="calendar_container">
+                        <property name="orientation">vertical</property>
+                      </object>
+                    </property>
+                  </object>
+                </property>
+              </object>
+            </child>
+            <child>
+              <object class="GtkLabel"><property name="label"> </property></object>
+            </child>
+            <child>
+              <object class="GtkDropDown" id="hour_dropdown"/>
+            </child>
+            <child>
+              <object class="GtkLabel"><property name="label">:</property></object>
+            </child>
+            <child>
+              <object class="GtkDropDown" id="min_dropdown"/>
+            </child>
+          </object>
+        </child>
+
+      </object>
+    </property>
+  </template>
+</interface>

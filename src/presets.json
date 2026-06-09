@@ -1,0 +1,41 @@
+[
+  {
+    "name": "Estrogel",
+    "substance": "Estradiol",
+    "default_method": "Transdermal",
+    "unit": "g",
+    "icon": "🧴",
+    "allowed_methods": "Transdermal",
+    "pk_data": {
+      "Transdermal": {"half_life": 36.0, "bio": 6.0, "peak": 16.0, "default_dose": 1.25, "unit": "g"},
+      "global_target_min": 100.0, "global_target_max": 200.0, "global_target_unit": "pg/mL"
+    },
+    "track_mode": "half_life"
+  },
+  {
+    "name": "Progynova",
+    "substance": "Estradiol",
+    "default_method": "Oral",
+    "unit": "mg",
+    "icon": "💊",
+    "allowed_methods": "Oral, Sublingual",
+    "pk_data": {
+      "Oral": {"half_life": 15.0, "bio": 5.0, "peak": 4.0, "default_dose": 2.0, "unit": "mg"},
+      "Sublingual": {"half_life": 10.0, "bio": 25.0, "peak": 1.0, "default_dose": 2.0, "unit": "mg"},
+      "global_target_min": 100.0, "global_target_max": 200.0, "global_target_unit": "pg/mL"
+    },
+    "track_mode": "half_life"
+  },
+  {
+    "name": "Androcur",
+    "substance": "Cyproterone Acetate",
+    "default_method": "Oral",
+    "unit": "mg",
+    "icon": "💊",
+    "allowed_methods": "Oral",
+    "pk_data": {
+      "Oral": {"half_life": 40.0, "bio": 100.0, "peak": 3.0, "default_dose": 12.5, "unit": "mg"}
+    },
+    "track_mode": "dosage"
+  }
+]

@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface>
+  <requires lib="gtk" version="4.0"/>
+  <requires lib="Adw" version="1.0"/>
+  <template class="MedicationCreatorPage" parent="AdwNavigationPage">
+    <property name="title" translatable="yes">Craft Medication</property>
+    <property name="child">
+      <object class="AdwToolbarView">
+        <child type="top">
+          <object class="AdwHeaderBar">
+            <property name="show-start-title-buttons">False</property>
+            <child type="end">
+              <object class="GtkButton" id="craft_button">
+                <property name="label" translatable="yes">Craft</property>
+                <style><class name="suggested-action"/></style>
+              </object>
+            </child>
+          </object>
+        </child>
+        <property name="content">
+          <object class="AdwPreferencesPage">
+
+            <child>
+              <object class="AdwPreferencesGroup">
+                <child>
+                  <object class="AdwEntryRow" id="creator_name_row">
+                    <property name="title" translatable="yes">Medication Name</property>
+                  </object>
+                </child>
+                <child>
+                  <object class="AdwEntryRow" id="creator_substance_row">
+                    <property name="title" translatable="yes">Active Substance</property>
+                  </object>
+                </child>
+                <child>
+                  <object class="AdwComboRow" id="creator_icon_row">
+                    <property name="title" translatable="yes">Select Icon</property>
+                  </object>
+                </child>
+                <child>
+                  <object class="AdwComboRow" id="track_mode_row">
+                    <property name="title" translatable="yes">Tracking Mode</property>
+                  </object>
+                </child>
+                <child>
+                  <object class="AdwComboRow" id="target_unit_row">
+                    <property name="title" translatable="yes">Target Level Unit</property>
+                  </object>
+                </child>
+                <child>
+                  <object class="AdwSpinRow" id="target_min_row">
+                    <property name="title" translatable="yes">Target Min Level</property>
+                    <property name="numeric">True</property>
+                    <property name="digits">1</property>
+                  </object>
+                </child>
+                <child>
+                  <object class="AdwSpinRow" id="target_max_row">
+                    <property name="title" translatable="yes">Target Max Level</property>
+                    <property name="numeric">True</property>
+                    <property name="digits">1</property>
+                  </object>
+                </child>
+              </object>
+            </child>
+
+            <child>
+              <object class="AdwPreferencesGroup" id="methods_list">
+                <property name="title" translatable="yes">Administration Routes and Setup</property>
+                <property name="description" translatable="yes">Check enabled routes. Click a row to configure its specific absorption parameters.</property>
+              </object>
+            </child>
+
+          </object>
+        </property>
+      </object>
+    </property>
+  </template>
+</interface>

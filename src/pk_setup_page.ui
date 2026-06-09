@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface>
+  <requires lib="gtk" version="4.0"/>
+  <requires lib="Adw" version="1.0"/>
+  <template class="PkSetupPage" parent="AdwNavigationPage">
+    <property name="title">PK Setup</property>
+    <property name="child">
+      <object class="AdwToolbarView">
+        <child type="top"><object class="AdwHeaderBar"/></child>
+        <property name="content">
+          <object class="AdwPreferencesPage">
+            <child>
+              <object class="AdwPreferencesGroup">
+                <child>
+                  <object class="AdwComboRow" id="unit_row">
+                    <property name="title" translatable="yes">Default Unit</property>
+                  </object>
+                </child>
+                <child>
+                  <object class="AdwSpinRow" id="default_dose_spin">
+                    <property name="title" translatable="yes">Default Dose per Intake</property>
+                    <property name="numeric">True</property>
+                    <property name="digits">2</property>
+                  </object>
+                </child>
+                <child>
+                  <object class="AdwSpinRow" id="half_life_spin">
+                    <property name="title" translatable="yes">Half-life (hours)</property>
+                    <property name="numeric">True</property>
+                    <property name="digits">1</property>
+                  </object>
+                </child>
+                <child>
+                  <object class="AdwSpinRow" id="bio_spin">
+                    <property name="title" translatable="yes">Bioavailability (%)</property>
+                    <property name="numeric">True</property>
+                    <property name="digits">0</property>
+                  </object>
+                </child>
+                <child>
+                  <object class="AdwSpinRow" id="peak_spin">
+                    <property name="title" translatable="yes">Time to Peak (hours)</property>
+                    <property name="numeric">True</property>
+                    <property name="digits">1</property>
+                  </object>
+                </child>
+              </object>
+            </child>
+          </object>
+        </property>
+      </object>
+    </property>
+  </template>
+</interface>
