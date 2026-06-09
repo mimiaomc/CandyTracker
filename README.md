@@ -1,5 +1,5 @@
 # CandyTracker
-README | English | [中文（简体）](README.zh.md)
+README | English | [中文（简体）](README.zh_CN.md)
 
 ![CandyTracker](data/icons/hicolor/scalable/apps/com.github.mimiaomc.candytracker.svg)
 
