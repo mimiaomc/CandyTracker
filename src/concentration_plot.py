@@ -127,56 +127,138 @@ class ConcentrationPlot(Gtk.Box):
             except: meds_pk[r[0]] = {}
 
         now = datetime.now(timezone.utc)
-        ten_days_ago = (now - timedelta(days=10)).strftime("%Y-%m-%d %H:%M:%S")
 
-        cursor.execute("SELECT timestamp, med_name, dose_mg, method FROM records WHERE substance = ? AND timestamp >= ? ORDER BY timestamp ASC", (target_substance, ten_days_ago))
+        # 120 天绝对足够让三室模型的脂肪储库完美达到稳态
+        burn_in_limit = (now - timedelta(days=120)).strftime("%Y-%m-%d %H:%M:%S")
+
+        cursor.execute(
+            "SELECT timestamp, med_name, dose_mg, method FROM records "
+            "WHERE substance = ? AND timestamp >= ? ORDER BY timestamp ASC",
+            (target_substance, burn_in_limit)
+        )
         records = cursor.fetchall()
         conn.close()
 
         now_ts = now.timestamp()
         start_sim = now_ts - 36 * 3600
         end_sim = now_ts + 12 * 3600
-        step = 1800
-        current_t = start_sim
-        has_future_records = False
 
-        # 容积动态计算 (19.0 L/kg 为 E2 的表观分布容积)
-        dynamic_multiplier = 1000000.0 / (user_weight * 19.0)
+        # 双引擎混合渲染器
+        self.points, has_valid_records = self._calc_mixed_models(records, meds_pk, user_weight, start_sim, end_sim)
 
-        while current_t <= end_sim:
-            total_conc = 0.0
-            for rec_time_str, m_name, dose, method in records:
-                try: rec_ts = datetime.strptime(rec_time_str, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc).timestamp()
-                except: continue
-
-                if rec_ts > current_t: continue
-                has_future_records = True
-
-                delta_hours = (current_t - rec_ts) / 3600.0
-                route_pk = meds_pk.get(m_name, {}).get(method, {})
-                half_life = route_pk.get("half_life", 12.0)
-                bio = route_pk.get("bio", 5.0) / 100.0
-                peak = route_pk.get("peak", 2.0)
-
-                ke = 0.693 / max(half_life, 0.1)
-                ka = 2.0 / max(peak, 0.1)
-                for i in range(3):
-                    if ka <= ke: ka = ke + 0.1
-                    ka = math.log(ka / ke) / max(peak, 0.1) + ke
-
-                # 🌟 第三步：彻底废弃魔法数字 800，装载千人千面的个体化乘数！
-                amplitude = (dose * bio * dynamic_multiplier) * (ka / max(ka - ke, 0.01))
-                conc_contribution = amplitude * (math.exp(-ke * delta_hours) - math.exp(-ka * delta_hours))
-                total_conc += max(conc_contribution, 0.0)
-
-            self.points.append((current_t, total_conc))
-            current_t += step
-
-        if not has_future_records:
+        if not has_valid_records:
             self.status_msg = _("No recent records for {substance}.").format(substance=_(target_substance))
             self.points.clear()
+        else:
+            self.status_msg = ""
 
         self.drawing_area.queue_draw()
+
+    def _calc_mixed_models(self, records, meds_pk, user_weight, start_sim, end_sim):
+        parsed_records = []
+        has_valid_records = False
+        for rec_time_str, m_name, dose, method in records:
+            try:
+                rec_ts = datetime.strptime(rec_time_str, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc).timestamp()
+                parsed_records.append({
+                    "ts": rec_ts,
+                    "dose": dose,
+                    "pk": meds_pk.get(m_name, {}).get(method, {})
+                })
+                # 只要存在未超出渲染末尾期限的数据，就说明图表里有东西画
+                if rec_ts <= end_sim:
+                    has_valid_records = True
+            except: pass
+
+        parsed_records.sort(key=lambda x: x["ts"])
+
+        # 智能路由分拣
+        euler_records = [r for r in parsed_records if r["pk"].get("model") == "3_compartment"]
+        bateman_records = [r for r in parsed_records if r["pk"].get("model") != "3_compartment"]
+
+        # 三室模型必须从有史以来第一针开始积分，以累计深外周室（脂肪）里的药量
+        integration_start = start_sim
+        if euler_records:
+            integration_start = min(euler_records[0]["ts"], start_sim)
+
+        dt_hours = 0.5  # 半小时一帧积分，性能与精度的完美平衡
+        step_sec = dt_hours * 3600.0
+        current_t = integration_start
+
+        points = []
+        dynamic_multiplier = 1000000.0 / (user_weight * 19.0)
+
+        # 初始三室水池
+        depot_mg = 0.0
+        central_mg = 0.0
+        fat_mg = 0.0
+        record_idx = 0
+
+        while current_t <= end_sim:
+
+            # 三室模型 (Euler Method)
+            while record_idx < len(parsed_records):
+                rec = parsed_records[record_idx]
+                if current_t >= rec["ts"]:
+                    if rec["pk"].get("model") == "3_compartment":
+                        depot_mg += rec["dose"]
+                    record_idx += 1
+                else:
+                    break
+
+            euler_conc = 0.0
+            if euler_records:
+                # 提取配置参数 (默认从找到的第一个高阶配置里提取)
+                pk_info = euler_records[0]["pk"]
+                k_absorb = pk_info.get("k_absorb", 0.02)
+                k_elim = pk_info.get("k_elim", 0.15)
+                k_cf = pk_info.get("k_cf", 0.08)
+                k_fc = pk_info.get("k_fc", 0.01)
+                vd = pk_info.get("vd", 20.0)
+
+                # 计算流量
+                absorbed = depot_mg * k_absorb * dt_hours
+                eliminated = central_mg * k_elim * dt_hours
+                to_fat = central_mg * k_cf * dt_hours
+                from_fat = fat_mg * k_fc * dt_hours
+
+                # 刷新水池
+                depot_mg = max(0.0, depot_mg - absorbed)
+                fat_mg = max(0.0, fat_mg + to_fat - from_fat)
+                central_mg = max(0.0, central_mg + absorbed + from_fat - eliminated - to_fat)
+
+                euler_conc = (central_mg / vd) * 1000
+
+            # 单室模型
+            if current_t >= start_sim:
+                bateman_conc = 0.0
+                for rec in bateman_records:
+                    if rec["ts"] > current_t:
+                        break  # 未来的药不参与计算
+
+                    delta_hours = (current_t - rec["ts"]) / 3600.0
+                    route_pk = rec["pk"]
+                    half_life = route_pk.get("half_life", 12.0)
+                    bio = route_pk.get("bio", 5.0) / 100.0
+                    peak = route_pk.get("peak", 2.0)
+
+                    ke = 0.693 / max(half_life, 0.1)
+                    ka = 2.0 / max(peak, 0.1)
+                    for _ in range(3):
+                        if ka <= ke: ka = ke + 0.1
+                        ka = math.log(ka / ke) / max(peak, 0.1) + ke
+
+                    amplitude = (rec["dose"] * bio * dynamic_multiplier) * (ka / max(ka - ke, 0.01))
+                    conc_contribution = amplitude * (math.exp(-ke * delta_hours) - math.exp(-ka * delta_hours))
+                    bateman_conc += max(conc_contribution, 0.0)
+
+                # 将高阶代谢物与普通药物在同一时刻的浓度叠加
+                points.append((current_t, euler_conc + bateman_conc))
+
+            # 推进时间轴
+            current_t += step_sec
+
+        return points, has_valid_records
 
     def on_draw(self, drawing_area, cr, width, height):
         if self.status_msg:

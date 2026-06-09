@@ -3,49 +3,119 @@
   <requires lib="gtk" version="4.0"/>
   <requires lib="Adw" version="1.0"/>
   <template class="PkSetupPage" parent="AdwNavigationPage">
-    <property name="title">PK Setup</property>
+    <property name="title" translatable="yes">Route Setup</property>
     <property name="child">
       <object class="AdwToolbarView">
-        <child type="top"><object class="AdwHeaderBar"/></child>
+        <child type="top">
+          <object class="AdwHeaderBar"/>
+        </child>
         <property name="content">
           <object class="AdwPreferencesPage">
+
             <child>
-              <object class="AdwPreferencesGroup">
+              <object class="AdwPreferencesGroup" id="model_selection_group">
+                <property name="title" translatable="yes">Pharmacokinetics Model</property>
                 <child>
-                  <object class="AdwComboRow" id="unit_row">
-                    <property name="title" translatable="yes">Default Unit</property>
+                  <object class="AdwActionRow">
+                    <property name="title" translatable="yes">Advanced Multi-Compartment Model</property>
+                    <property name="subtitle" translatable="yes">Enable Euler integration for deep tissue distribution.</property>
+                    <child type="suffix">
+                      <object class="GtkSwitch" id="advanced_model_switch">
+                        <property name="valign">center</property>
+                      </object>
+                    </child>
                   </object>
                 </child>
+              </object>
+            </child>
+
+            <child>
+              <object class="AdwPreferencesGroup" id="standard_pk_group">
+                <property name="title" translatable="yes">Standard Parameters</property>
                 <child>
-                  <object class="AdwSpinRow" id="default_dose_spin">
-                    <property name="title" translatable="yes">Default Dose per Intake</property>
-                    <property name="numeric">True</property>
-                    <property name="digits">2</property>
-                  </object>
-                </child>
-                <child>
-                  <object class="AdwSpinRow" id="half_life_spin">
-                    <property name="title" translatable="yes">Half-life (hours)</property>
+                  <object class="AdwSpinRow" id="spin_half_life">
+                    <property name="title" translatable="yes">Half-Life (Hours)</property>
                     <property name="numeric">True</property>
                     <property name="digits">1</property>
                   </object>
                 </child>
                 <child>
-                  <object class="AdwSpinRow" id="bio_spin">
-                    <property name="title" translatable="yes">Bioavailability (%)</property>
+                  <object class="AdwSpinRow" id="spin_peak">
+                    <property name="title" translatable="yes">Peak Time (Hours)</property>
                     <property name="numeric">True</property>
-                    <property name="digits">0</property>
+                    <property name="digits">1</property>
                   </object>
                 </child>
                 <child>
-                  <object class="AdwSpinRow" id="peak_spin">
-                    <property name="title" translatable="yes">Time to Peak (hours)</property>
+                  <object class="AdwSpinRow" id="spin_bio">
+                    <property name="title" translatable="yes">Bioavailability (%)</property>
                     <property name="numeric">True</property>
                     <property name="digits">1</property>
                   </object>
                 </child>
               </object>
             </child>
+
+            <child>
+              <object class="AdwPreferencesGroup" id="advanced_pk_group">
+                <property name="title" translatable="yes">Advanced Multi-Compartment Parameters</property>
+                <property name="visible">False</property>
+                <child>
+                  <object class="AdwSpinRow" id="spin_k_absorb">
+                    <property name="title" translatable="yes">Absorption Rate (k_absorb)</property>
+                    <property name="numeric">True</property>
+                    <property name="digits">3</property>
+                  </object>
+                </child>
+                <child>
+                  <object class="AdwSpinRow" id="spin_k_elim">
+                    <property name="title" translatable="yes">Elimination Rate (k_elim)</property>
+                    <property name="numeric">True</property>
+                    <property name="digits">3</property>
+                  </object>
+                </child>
+                <child>
+                  <object class="AdwSpinRow" id="spin_k_cf">
+                    <property name="title" translatable="yes">Blood → Fat Rate (k_cf)</property>
+                    <property name="numeric">True</property>
+                    <property name="digits">3</property>
+                  </object>
+                </child>
+                <child>
+                  <object class="AdwSpinRow" id="spin_k_fc">
+                    <property name="title" translatable="yes">Fat → Blood Rate (k_fc)</property>
+                    <property name="numeric">True</property>
+                    <property name="digits">3</property>
+                  </object>
+                </child>
+                <child>
+                  <object class="AdwSpinRow" id="spin_vd">
+                    <property name="title" translatable="yes">Volume of Distribution (Vd)</property>
+                    <property name="numeric">True</property>
+                    <property name="digits">1</property>
+                  </object>
+                </child>
+              </object>
+            </child>
+
+            <child>
+              <object class="AdwPreferencesGroup">
+                <property name="title" translatable="yes">Dosage Setup</property>
+                <child>
+                  <object class="AdwSpinRow" id="spin_dose">
+                    <property name="title" translatable="yes">Default Dose</property>
+                    <property name="numeric">True</property>
+                    <property name="digits">2</property>
+                  </object>
+                </child>
+                <child>
+                  <object class="AdwComboRow" id="unit_row">
+                    <property name="title" translatable="yes">Dose Unit</property>
+                  </object>
+                </child>
+              </object>
+            </child>
+
           </object>
         </property>
       </object>

@@ -1,4 +1,3 @@
-# medication_creator_page.py
 import sqlite3
 import json
 import gi
