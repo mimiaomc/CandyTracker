@@ -1,8 +1,8 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: \n"
-"POT-Creation-Date: 2026-06-09 23:59+0000\n"
-"PO-Revision-Date: 2026-06-09 23:59+0000\n"
+"POT-Creation-Date: 2026-06-10 00:23+0000\n"
+"PO-Revision-Date: 2026-06-10 00:24+0000\n"
 "Last-Translator: \n"
 "Language-Team: \n"
 "Language: zh_CN\n"
@@ -22,8 +22,8 @@ msgstr "添加记录"
 msgid "Log your intake accurately:"
 msgstr "准确记录您的摄入量："
 
-#: src/add_record_dialog.ui:11 src/medication_creator_page.py:163
-#: src/window.py:355 src/window.py:500 src/window.py:588
+#: src/add_record_dialog.ui:11 src/medication_creator_page.py:172
+#: src/medication_creator_page.py:218 src/window.py:356 src/window.py:585
 msgid "Cancel"
 msgstr "取消"
 
@@ -54,11 +54,11 @@ msgstr "目标：{dose:.1f} mg/day"
 msgid "No recent records for {substance}."
 msgstr "没有关于{substance}的近期记录。"
 
-#: src/concentration_plot.py:340
+#: src/concentration_plot.py:341
 msgid "7-Day Avg"
 msgstr "7 天平均值"
 
-#: src/concentration_plot.py:340
+#: src/concentration_plot.py:341
 msgid "Target"
 msgstr "目标"
 
@@ -71,28 +71,36 @@ msgstr "糖糖"
 msgid "translator-credits"
 msgstr "家猫"
 
-#: src/medication_creator_page.py:35
+#: src/medication_creator_page.py:38
 #, python-brace-format
 msgid "{icon} Style"
 msgstr "{icon} 样式"
 
-#: src/medication_creator_page.py:36
+#: src/medication_creator_page.py:39
 msgid "Pharmacokinetics (PK)"
 msgstr "药代动力学"
 
-#: src/medication_creator_page.py:36
+#: src/medication_creator_page.py:39
 msgid "Pharmacodynamics (PD)"
 msgstr "药效动力学"
 
-#: src/medication_creator_page.py:110
+#: src/medication_creator_page.py:106
+msgid "Edit Medication"
+msgstr "编辑药品"
+
+#: src/medication_creator_page.py:107
+msgid "Apply"
+msgstr "应用"
+
+#: src/medication_creator_page.py:119
 msgid "Please fill out the medication name!"
 msgstr "请填写药品名称！"
 
-#: src/medication_creator_page.py:151
+#: src/medication_creator_page.py:160
 msgid "Personal Data Required"
 msgstr "需要个人数据"
 
-#: src/medication_creator_page.py:152
+#: src/medication_creator_page.py:161
 msgid ""
 "To accurately predict the Pharmacokinetics (PK) curve for this medication, "
 "we need your body weight to dynamically calculate the Apparent Volume of "
@@ -101,21 +109,41 @@ msgstr ""
 "为了准确预测该药物的药代动力学 (PK) 曲线，我们需要您的体重来动态计算表观分布"
 "容积 (Vd)。"
 
-#: src/medication_creator_page.py:155 src/window.ui:516
+#: src/medication_creator_page.py:164 src/window.ui:516
 msgid "Body Weight (kg)"
 msgstr "体重（千克）"
 
-#: src/medication_creator_page.py:164
+#: src/medication_creator_page.py:173
 msgid "Save & Craft"
 msgstr "保存并创建"
 
-#: src/medication_creator_page.py:188
+#: src/medication_creator_page.py:205
 msgid "Success"
 msgstr "成功"
 
-#: src/medication_creator_page.py:190
+#: src/medication_creator_page.py:207
 msgid "This name already exists inside your active box."
 msgstr "名称已存在。"
+
+#: src/medication_creator_page.py:215
+#, python-brace-format
+msgid "Remove '{med_name}'?"
+msgstr "删除 '{med_name}'？"
+
+#: src/medication_creator_page.py:216
+msgid ""
+"Do you want to keep its intake history logs, or completely wipe all past "
+"records associated with this medication name?"
+msgstr ""
+"您想保留该药物的服用历史记录，还是彻底清除与该药物名称相关的所有历史记录？"
+
+#: src/medication_creator_page.py:219
+msgid "Keep History (Archive)"
+msgstr "保留历史（存档）"
+
+#: src/medication_creator_page.py:220
+msgid "Delete Med & History"
+msgstr "删除药物和记录"
 
 #: src/medication_creator_page.ui:6
 msgid "Craft Medication"
@@ -162,6 +190,10 @@ msgid ""
 "Check enabled routes. Click a row to configure its specific absorption "
 "parameters."
 msgstr "勾选来确定可能的给药方式，点击可配置其具体的吸收参数。"
+
+#: src/medication_creator_page.ui:78
+msgid "Delete Medication"
+msgstr "删除药品"
 
 #: src/pk_setup_page.py:31
 msgid " Setup"
@@ -313,7 +345,7 @@ msgstr "醋酸环丙孕酮"
 msgid "Estradiol Valerate"
 msgstr "雌二醇针剂"
 
-#: src/window.py:24 src/window.py:391
+#: src/window.py:24 src/window.py:392
 msgid "Oral"
 msgstr "口服"
 
@@ -393,7 +425,7 @@ msgstr "历史"
 msgid "Medications"
 msgstr "药品"
 
-#: src/window.py:167 src/window.py:356 src/window.ui:425
+#: src/window.py:167 src/window.py:357 src/window.ui:425
 msgid "App Library"
 msgstr "应用药品库"
 
@@ -406,75 +438,60 @@ msgstr "个人"
 msgid "{methods}  |  Unit: {unit}  |  Sub: {substance}"
 msgstr "{methods}  |  单位：{unit}  |  物质：{substance}"
 
-#: src/window.py:303
+#: src/window.py:304
 #, python-brace-format
 msgid "Substance: {substance}  |  Routes: {routes}"
 msgstr "物质：{substance}  |  路径：{routes}"
 
-#: src/window.py:333
+#: src/window.py:334
 #, python-brace-format
 msgid "Medication '{med_name}' imported!"
 msgstr "药品 '{med_name}' 成功创建！"
 
-#: src/window.py:352 src/window.ui:357
+#: src/window.py:353 src/window.ui:357
 msgid "Add Medication"
 msgstr "添加药品"
 
-#: src/window.py:353
+#: src/window.py:354
 msgid "Where would you like to add the medication from?"
 msgstr "你想从哪里添加药物？"
 
-#: src/window.py:357
+#: src/window.py:358
 msgid "Custom Medication"
 msgstr "定制药品"
 
-#: src/window.py:371
+#: src/window.py:372
 #, python-brace-format
 msgid "Medication '{med_name}' crafted successfully!"
 msgstr "药品 '{med_name}' 成功创建！"
 
-#: src/window.py:465
+#: src/window.py:466
 msgid "All History Records"
 msgstr "所有历史记录"
 
-#: src/window.py:466
+#: src/window.py:467
 msgid "Below is the full historical log of your candy intake:"
 msgstr "以下是您完整的历史记录："
 
-#: src/window.py:468 src/window.py:713
+#: src/window.py:469 src/window.py:710
 msgid "Close"
 msgstr "关闭"
 
-#: src/window.py:497
-#, python-brace-format
-msgid "Remove '{med_name}'?"
-msgstr "删除 '{med_name}'？"
-
-#: src/window.py:498
-msgid ""
-"Do you want to keep its intake history logs, or completely wipe all past "
-"records associated with this medication name?"
-msgstr ""
-"您想保留该药物的服用历史记录，还是彻底清除与该药物名称相关的所有历史记录？"
-
-#: src/window.py:501
-msgid "Keep History (Archive)"
-msgstr "保留历史（存档）"
-
-#: src/window.py:502
-msgid "Delete Med & History"
-msgstr "删除药物和记录"
-
-#: src/window.py:524
+#: src/window.py:508
 #, python-brace-format
 msgid "'{med_name}' removed."
 msgstr "已删除 '{med_name}'。"
 
-#: src/window.py:534
+#: src/window.py:510
+#, python-brace-format
+msgid "Medication '{med_name}' updated!"
+msgstr "药品 '{med_name}' 成功更新！"
+
+#: src/window.py:531
 msgid "Your Active Box is Empty"
 msgstr "您的药物信息为空"
 
-#: src/window.py:535
+#: src/window.py:532
 msgid ""
 "You don't have any active medications to log records.\n"
 "Please switch to the 'Medications' tab on the left sidebar and import or "
@@ -483,44 +500,44 @@ msgstr ""
 "您目前没有任何正在服用的药物需要记录！\n"
 "请切换到“药物”选项卡，先创建一条药物。"
 
-#: src/window.py:537
+#: src/window.py:534
 msgid "I see"
 msgstr "明白"
 
-#: src/window.py:581
+#: src/window.py:578
 #, python-brace-format
 msgid "Added {med_name} successfully!"
 msgstr "成功添加 {med_name}"
 
-#: src/window.py:587
+#: src/window.py:584
 msgid "Delete this record?"
 msgstr "删除这项记录吗？"
 
-#: src/window.py:587
+#: src/window.py:584
 msgid "This action cannot be undone."
 msgstr "此操作无法撤销。"
 
-#: src/window.py:589
+#: src/window.py:586
 msgid "Delete"
 msgstr "删除"
 
-#: src/window.py:602
+#: src/window.py:599
 msgid "Record deleted."
 msgstr "已删除记录。"
 
-#: src/window.py:618
+#: src/window.py:615
 msgid "No active medications. Add one from the Library!"
 msgstr "没有激活的药物。请从库中添加一个！"
 
-#: src/window.py:712
+#: src/window.py:709
 msgid "PK/PD Data"
 msgstr "详细数据"
 
-#: src/window.py:712
+#: src/window.py:709
 msgid "Tap a row to copy:"
 msgstr "点击复制："
 
-#: src/window.py:742
+#: src/window.py:739
 #, python-brace-format
 msgid "Copied: {text}"
 msgstr "已复制：{text}"
