@@ -20,6 +20,7 @@ from .concentration_plot import ConcentrationPlot
 __TRANSLATION_ANCHORS = [
     _("Estrogel"), _("Progynova"), _("Androcur"),
     _("Estradiol"), _("Cyproterone Acetate"),
+    _("Estradiol Valerate"),
     _("Oral"), _("Sublingual"), _("Transdermal"), _("Injection")
 ]
 # ==============================================================================
