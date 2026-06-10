@@ -214,7 +214,7 @@ class ConcentrationPlot(Gtk.Box):
                 k_elim = pk_info.get("k_elim", 0.15)
                 k_cf = pk_info.get("k_cf", 0.08)
                 k_fc = pk_info.get("k_fc", 0.01)
-                vd = pk_info.get("vd", 20.0)
+                vd = pk_info.get("vd", 19.0) # 默认值设为 19.0 L/kg
 
                 # 计算流量
                 absorbed = depot_mg * k_absorb * dt_hours
@@ -227,7 +227,8 @@ class ConcentrationPlot(Gtk.Box):
                 fat_mg = max(0.0, fat_mg + to_fat - from_fat)
                 central_mg = max(0.0, central_mg + absorbed + from_fat - eliminated - to_fat)
 
-                euler_conc = (central_mg / vd) * 1000
+                # 对齐 Bateman 的物理现实公式 (mg -> pg, L -> mL)
+                euler_conc = (central_mg * 1000000.0) / (user_weight * vd)
 
             # 单室模型
             if current_t >= start_sim:
