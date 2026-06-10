@@ -24,6 +24,14 @@ Medicine creator (currently in Chinese)
 ## Documentation
 See the `docs` folder for more details.
 
+## Disclaimer & EULA
+This software utilizes a simplified one-compartment pharmacokinetic model for simulation purposes. Please read and agree to the following before use:
+- Not Medical Advice: This application is strictly for informational and educational purposes. It does not provide medical advice, diagnosis, or treatment.
+- Theoretical Simulations: The charts and calculated levels are mathematical approximations. They do not represent your actual blood serum concentrations.
+- Consult Professionals: Always consult a licensed healthcare provider before altering any medication or dosage. Rely on actual clinical blood tests for medical decisions.
+- No Liability: The developer assumes no responsibility or liability for any health consequences or errors arising from the use of this software.
+Please manage your health safely and responsibly under professional guidance!
+
 ## License
 This project is licensed under GPL-3.0-or-later.
 
