@@ -70,7 +70,20 @@
                 <property name="description" translatable="yes">Check enabled routes. Click a row to configure its specific absorption parameters.</property>
               </object>
             </child>
-
+            <child>
+              <object class="AdwPreferencesGroup" id="delete_group">
+                <property name="visible">False</property>
+                <child>
+                  <object class="GtkButton" id="delete_button">
+                    <property name="label" translatable="yes">Delete Medication</property>
+                    <property name="halign">center</property>
+                    <style>
+                      <class name="destructive-action"/>
+                      <class name="pill"/> </style>
+                  </object>
+                </child>
+              </object>
+            </child>
           </object>
         </property>
       </object>

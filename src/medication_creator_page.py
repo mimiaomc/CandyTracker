@@ -8,6 +8,8 @@ from .pk_setup_page import PkSetupPage
 @Gtk.Template(resource_path="/com/github/mimiaomc/candytracker/medication_creator_page.ui")
 class MedicationCreatorPage(Adw.NavigationPage):
     __gtype_name__ = "MedicationCreatorPage"
+    delete_group = Gtk.Template.Child()
+    delete_button = Gtk.Template.Child()
 
     craft_button = Gtk.Template.Child()
     creator_name_row = Gtk.Template.Child()
@@ -19,8 +21,9 @@ class MedicationCreatorPage(Adw.NavigationPage):
     methods_list = Gtk.Template.Child()
     creator_substance_row = Gtk.Template.Child()
 
-    def __init__(self, nav_view, preset_methods, preset_units, preset_icons, db_path, on_success_cb, prefill_data=None, **kwargs):
+    def __init__(self, nav_view, preset_methods, preset_units, preset_icons, db_path, on_success_cb, prefill_data=None, edit_med_id=None, **kwargs):
         super().__init__(**kwargs)
+        self.edit_med_id = edit_med_id  # 记录编辑模式的 ID
         self.nav_view = nav_view
         self.preset_methods = preset_methods
         self.preset_units = preset_units
@@ -99,6 +102,12 @@ class MedicationCreatorPage(Adw.NavigationPage):
             if self.preset_methods:
                 self.method_checks[self.preset_methods[0]].set_active(True)
 
+        if self.edit_med_id:
+            self.set_title(_("Edit Medication"))
+            self.craft_button.set_label(_("Apply"))
+            self.delete_group.set_visible(True)
+            self.delete_button.connect("clicked", self.on_delete_clicked)
+
     def on_route_activated(self, route_name):
         current_mode = "dosage" if self.track_mode_row.get_selected() == 1 else "half_life"
         page = PkSetupPage(route_name, self.pk_data_dict[route_name], self.preset_units, current_mode)
@@ -143,7 +152,7 @@ class MedicationCreatorPage(Adw.NavigationPage):
                 return
 
         # PD模式，或者已经有体重了，直接保存
-        self._execute_db_insert(name, substance, allowed, icon, allowed_str, final_pk_data, track_mode, global_fallback_unit)
+        self._execute_db_save(name, substance, allowed, icon, allowed_str, final_pk_data, track_mode, global_fallback_unit)
 
     def prompt_weight_and_save(self, name, substance, allowed, icon, allowed_str, final_pk_data, track_mode, global_fallback_unit):
         dialog = Adw.MessageDialog(
@@ -171,22 +180,62 @@ class MedicationCreatorPage(Adw.NavigationPage):
                 conn.execute("UPDATE preferences SET value = ? WHERE key = 'user_weight'", (str(weight),))
                 conn.commit()
                 conn.close()
-                self._execute_db_insert(name, substance, allowed, icon, allowed_str, final_pk_data, track_mode, global_fallback_unit)
+                self._execute_db_save(name, substance, allowed, icon, allowed_str, final_pk_data, track_mode, global_fallback_unit)
 
         dialog.connect("response", on_response)
         dialog.present()
 
-    def _execute_db_insert(self, name, substance, allowed, icon, allowed_str, final_pk_data, track_mode, global_fallback_unit):
+    def _execute_db_save(self, name, substance, allowed, icon, allowed_str, final_pk_data, track_mode, global_fallback_unit):
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         try:
-            cursor.execute(
-                "INSERT INTO medications (name, substance, default_method, unit, icon, allowed_methods, pk_data, track_mode) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                (name, substance, allowed[0], global_fallback_unit, icon, allowed_str, json.dumps(final_pk_data), track_mode)
-            )
+            if self.edit_med_id:
+                # 编辑模式：UPDATE 数据
+                cursor.execute(
+                    "UPDATE medications SET name=?, substance=?, default_method=?, unit=?, icon=?, allowed_methods=?, pk_data=?, track_mode=? WHERE id=?",
+                    (name, substance, allowed[0], global_fallback_unit, icon, allowed_str, json.dumps(final_pk_data), track_mode, self.edit_med_id)
+                )
+            else:
+                # 创建模式：INSERT 数据
+                cursor.execute(
+                    "INSERT INTO medications (name, substance, default_method, unit, icon, allowed_methods, pk_data, track_mode) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                    (name, substance, allowed[0], global_fallback_unit, icon, allowed_str, json.dumps(final_pk_data), track_mode)
+                )
             conn.commit()
             self.on_success_cb(name, True, _("Success"))
         except sqlite3.IntegrityError:
             self.on_success_cb(name, False, _("This name already exists inside your active box."))
         finally:
             conn.close()
+
+    def on_delete_clicked(self, button):
+        name = self.creator_name_row.get_text().strip()
+        confirm_dialog = Adw.MessageDialog(
+            transient_for=self.get_root(),
+            heading=_("Remove '{med_name}'?").format(med_name=name),
+            body=_("Do you want to keep its intake history logs, or completely wipe all past records associated with this medication name?")
+        )
+        confirm_dialog.add_response("cancel", _("Cancel"))
+        confirm_dialog.add_response("keep", _("Keep History (Archive)"))
+        confirm_dialog.add_response("delete_all", _("Delete Med & History"))
+        confirm_dialog.set_response_appearance("delete_all", Adw.ResponseAppearance.DESTRUCTIVE)
+
+        def handle_med_delete_response(dialog_window, response_id):
+            if response_id not in ("keep", "delete_all"):
+                return
+
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+
+            if response_id == "delete_all":
+                cursor.execute("DELETE FROM records WHERE med_name = ?", (name,))
+
+            cursor.execute("DELETE FROM medications WHERE id = ?", (self.edit_med_id,))
+            conn.commit()
+            conn.close()
+
+            # 借用 cb 函数触发删除成功的通知和后退动作
+            self.on_success_cb(name, True, "Deleted")
+
+        confirm_dialog.connect("response", handle_med_delete_response)
+        confirm_dialog.present()

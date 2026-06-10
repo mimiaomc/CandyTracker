@@ -205,7 +205,7 @@ class CandytrackerWindow(Adw.ApplicationWindow):
 
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        cursor.execute("SELECT id, name, substance, default_method, unit, icon, allowed_methods, pk_data FROM medications ORDER BY sort_order ASC, id ASC")
+        cursor.execute("SELECT id, name, substance, default_method, unit, icon, allowed_methods, pk_data, track_mode FROM medications ORDER BY sort_order ASC, id ASC")
         rows = cursor.fetchall()
         conn.close()
 
@@ -267,7 +267,8 @@ class CandytrackerWindow(Adw.ApplicationWindow):
             action_row.add_suffix(btn_box)
 
             action_row.set_activatable(True)
-            action_row.connect("activated", lambda r, rid=row[0], mname=row[1]: self.trigger_med_delete(rid, mname))
+            # 把整行数据传给打开编辑器的函数
+            action_row.connect("activated", lambda r, mdata=row: self.open_med_editor(mdata))
 
             self.meds_list.append(action_row)
 
@@ -491,40 +492,36 @@ class CandytrackerWindow(Adw.ApplicationWindow):
         dialog.set_extra_child(scrolled)
         dialog.present()
 
-    def trigger_med_delete(self, target_id, med_name):
-        confirm_dialog = Adw.MessageDialog(
-            transient_for=self,
-            heading=_("Remove '{med_name}'?").format(med_name=med_name),
-            body=_("Do you want to keep its intake history logs, or completely wipe all past records associated with this medication name?")
+    def open_med_editor(self, row_data):
+        med_id = row_data[0]
+        # 对齐 prefill_data 格式: [name, substance, default_method, unit, icon, allowed_str, pk_json, track_mode]
+        payload = [row_data[1], row_data[2], row_data[3], row_data[4], row_data[5], row_data[6], row_data[7], row_data[8]]
+
+        def on_crafted(med_name, success, msg):
+            if success:
+                self.sync_weight_from_db()
+                self.load_medications()
+                self.load_dashboard()
+                self.meds_nav_view.pop()
+                if msg == "Deleted":
+                    self.load_history()
+                    self.toast_overlay.add_toast(Adw.Toast.new(_("'{med_name}' removed.").format(med_name=med_name)))
+                else:
+                    self.toast_overlay.add_toast(Adw.Toast.new(_("Medication '{med_name}' updated!").format(med_name=med_name)))
+            else:
+                self.toast_overlay.add_toast(Adw.Toast.new(msg))
+
+        creator_page = MedicationCreatorPage(
+            nav_view=self.meds_nav_view,
+            preset_methods=self.preset_methods,
+            preset_units=self.preset_units,
+            preset_icons=self.preset_icons,
+            db_path=self.db_path,
+            on_success_cb=on_crafted,
+            prefill_data=payload,
+            edit_med_id=med_id  # 传给内部触发“编辑模式”
         )
-        confirm_dialog.add_response("cancel", _("Cancel"))
-        confirm_dialog.add_response("keep", _("Keep History (Archive)"))
-        confirm_dialog.add_response("delete_all", _("Delete Med & History"))
-        confirm_dialog.set_response_appearance("delete_all", Adw.ResponseAppearance.DESTRUCTIVE)
-
-        def handle_med_delete_response(dialog_window, response_id):
-            if response_id not in ("keep", "delete_all"):
-                return
-
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-
-            if response_id == "delete_all":
-                cursor.execute("DELETE FROM records WHERE med_name = ?", (med_name,))
-
-            cursor.execute("DELETE FROM medications WHERE id = ?", (target_id,))
-
-            conn.commit()
-            conn.close()
-
-            self.load_history()
-            self.load_medications()
-            self.load_dashboard()
-
-            self.toast_overlay.add_toast(Adw.Toast.new(_("'{med_name}' removed.").format(med_name=med_name)))
-
-        confirm_dialog.connect("response", handle_med_delete_response)
-        confirm_dialog.present()
+        self.meds_nav_view.push(creator_page)
 
     @Gtk.Template.Callback()
     def on_add_record_clicked(self, button):
