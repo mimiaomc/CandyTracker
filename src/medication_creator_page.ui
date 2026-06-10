@@ -73,15 +73,34 @@
             <child>
               <object class="AdwPreferencesGroup" id="delete_group">
                 <property name="visible">False</property>
+
+                <child>
+                  <object class="GtkButton" id="clear_history_button">
+                    <property name="label" translatable="yes">Clear History Records</property>
+                    <property name="halign">center</property>
+                    <property name="width-request">220</property>
+                    <property name="margin-top">24</property>
+                    <property name="margin-bottom">8</property> <style>
+                      <class name="destructive-action"/>
+                      <class name="pill"/>
+                    </style>
+                  </object>
+                </child>
+
                 <child>
                   <object class="GtkButton" id="delete_button">
                     <property name="label" translatable="yes">Delete Medication</property>
                     <property name="halign">center</property>
+                    <property name="width-request">220</property>
+                    <property name="margin-top">8</property>
+                    <property name="margin-bottom">24</property>
                     <style>
                       <class name="destructive-action"/>
-                      <class name="pill"/> </style>
+                      <class name="pill"/>
+                    </style>
                   </object>
                 </child>
+
               </object>
             </child>
           </object>

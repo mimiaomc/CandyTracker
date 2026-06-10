@@ -20,6 +20,7 @@ class MedicationCreatorPage(Adw.NavigationPage):
     target_max_row = Gtk.Template.Child()
     methods_list = Gtk.Template.Child()
     creator_substance_row = Gtk.Template.Child()
+    clear_history_button = Gtk.Template.Child()
 
     def __init__(self, nav_view, preset_methods, preset_units, preset_icons, db_path, on_success_cb, prefill_data=None, edit_med_id=None, **kwargs):
         super().__init__(**kwargs)
@@ -107,6 +108,7 @@ class MedicationCreatorPage(Adw.NavigationPage):
             self.craft_button.set_label(_("Apply"))
             self.delete_group.set_visible(True)
             self.delete_button.connect("clicked", self.on_delete_clicked)
+            self.clear_history_button.connect("clicked", self.on_clear_history_clicked)
 
     def on_route_activated(self, route_name):
         current_mode = "dosage" if self.track_mode_row.get_selected() == 1 else "half_life"
@@ -239,3 +241,26 @@ class MedicationCreatorPage(Adw.NavigationPage):
 
         confirm_dialog.connect("response", handle_med_delete_response)
         confirm_dialog.present()
+
+    def on_clear_history_clicked(self, button):
+        name = self.creator_name_row.get_text().strip()
+        dialog = Adw.MessageDialog(
+            transient_for=self.get_root(),
+            heading=_("Clear all records for '{med_name}'?").format(med_name=name),
+            body=_("The medication will remain in your library, but all past intake history will be permanently wiped. This cannot be undone.")
+        )
+        dialog.add_response("cancel", _("Cancel"))
+        dialog.add_response("clear", _("Clear History"))
+        dialog.set_response_appearance("clear", Adw.ResponseAppearance.DESTRUCTIVE)
+
+        def on_response(d, response_id):
+            if response_id == "clear":
+                conn = sqlite3.connect(self.db_path)
+                conn.execute("DELETE FROM records WHERE med_name = ?", (name,))
+                conn.commit()
+                conn.close()
+                # 借用回调函数通知主窗口
+                self.on_success_cb(name, True, "HistoryCleared")
+
+        dialog.connect("response", on_response)
+        dialog.present()
