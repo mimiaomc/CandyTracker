@@ -80,12 +80,12 @@ class CandytrackerApplication(Adw.Application):
         win.present()
 
     def on_about_action(self, *args):
-        """🌟 极其华丽的 Libadwaita 原生关于窗口"""
+        """Libadwaita 原生关于窗口"""
         about = Adw.AboutDialog(
             application_name=_('CandyTracker'),
             application_icon='com.github.mimiaomc.candytracker',
             developer_name='MM 喵了个',
-            version='0.9.6',
+            version='0.9.7',
             translator_credits=_('translator-credits'),
             developers=['MM 喵了个'],
             copyright='© 2026 MM 喵了个',
