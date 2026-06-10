@@ -36,6 +36,7 @@ candytracker_sources = [
   'medication_creator_page.py',
   'pk_setup_page.py',
   'concentration_plot.py',
+  'chart_details_page.py',
 ]
 
 install_data(candytracker_sources, install_dir: moduledir)

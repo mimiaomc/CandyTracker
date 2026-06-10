@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface>
+  <requires lib="gtk" version="4.0"/>
+  <requires lib="Adw" version="1.0"/>
+  <template class="ChartDetailsPage" parent="AdwNavigationPage">
+    <property name="title" translatable="yes">Details</property>
+    <property name="child">
+      <object class="AdwToolbarView">
+        <child type="top">
+          <object class="AdwHeaderBar"/>
+        </child>
+        <property name="content">
+          <object class="GtkScrolledWindow">
+            <property name="hscrollbar-policy">never</property>
+            <child>
+              <object class="AdwClamp">
+                <property name="maximum-size">650</property>
+                <child>
+                  <object class="GtkBox">
+                    <property name="orientation">vertical</property>
+                    <property name="spacing">16</property>
+                    <property name="margin-top">24</property>
+                    <property name="margin-bottom">32</property>
+                    <property name="margin-start">24</property>
+                    <property name="margin-end">24</property>
+
+                    <child>
+                      <object class="AdwPreferencesGroup">
+                        <child>
+                          <object class="AdwActionRow" id="current_level_row">
+                            <property name="title" translatable="yes">Current Level</property>
+                            <child type="suffix">
+                              <object class="GtkLabel" id="current_level_label">
+                                <property name="label">0.00</property>
+                                <property name="valign">center</property>
+                              </object>
+                            </child>
+                          </object>
+                        </child>
+                      </object>
+                    </child>
+
+                    <child>
+                      <object class="AdwPreferencesGroup" id="chart_group">
+                        <property name="title" translatable="yes">Concentration Curve</property>
+                      </object>
+                    </child>
+
+                    <child>
+                      <object class="AdwPreferencesGroup">
+                        <child>
+                          <object class="AdwExpanderRow" id="data_expander">
+                            <property name="title" translatable="yes">Raw Data Points</property>
+                            <property name="subtitle" translatable="yes">Tap a row to copy to clipboard</property>
+                            <property name="icon-name">format-justify-left-symbolic</property>
+                            <property name="expanded">False</property>
+                          </object>
+                        </child>
+                      </object>
+                    </child>
+
+                  </object>
+                </child>
+              </object>
+            </child>
+          </object>
+        </property>
+      </object>
+    </property>
+  </template>
+</interface>

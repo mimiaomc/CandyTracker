@@ -155,82 +155,94 @@
                   <object class="AdwViewStackPage">
                     <property name="name">home</property>
                     <property name="child">
-                      <object class="AdwToolbarView">
-                        <child type="top">
-                          <object class="AdwHeaderBar">
-                            <property name="show-start-title-buttons">False</property>
-                            <property name="title-widget">
-                              <object class="AdwWindowTitle">
-                                <property name="title" translatable="yes">Home</property>
-                              </object>
-                            </property>
-                            <child type="start">
-                              <object class="GtkToggleButton">
-                                <property name="icon-name">sidebar-show-symbolic</property>
-                                <property name="active" bind-source="split_view" bind-property="show-sidebar" bind-flags="sync-create|bidirectional"/>
-                              </object>
-                            </child>
-                            <child type="end">
-                              <object class="GtkButton">
-                                <property name="icon-name">list-add-symbolic</property>
-                                <property name="tooltip-text" translatable="yes">Add Record</property>
-                                <signal name="clicked" handler="on_add_record_clicked"/>
-                                <style><class name="suggested-action"/></style>
-                              </object>
-                            </child>
-                            <child type="end">
-                              <object class="GtkMenuButton">
-                                <property name="icon-name">open-menu-symbolic</property>
-                                <property name="menu-model">primary_menu</property>
-                              </object>
-                            </child>
-                          </object>
-                        </child>
-                        <property name="content">
-                          <object class="GtkScrolledWindow">
-                            <property name="hscrollbar-policy">never</property>
-                            <child>
-                              <object class="AdwClamp">
-                                <property name="maximum-size">600</property>
-                                <child>
-                                  <object class="GtkBox">
-                                    <property name="orientation">vertical</property>
-                                    <property name="margin-top">24</property>
-                                    <property name="margin-bottom">32</property>
-                                    <property name="margin-start">24</property>
-                                    <property name="margin-end">24</property>
-                                    <property name="spacing">16</property>
+
+                      <object class="AdwNavigationView" id="home_nav_view">
+                        <child>
+                          <object class="AdwNavigationPage">
+                            <property name="title" translatable="yes">Dashboard</property>
+                            <property name="tag">home_main</property>
+                            <property name="child">
+
+                              <object class="AdwToolbarView">
+                                <child type="top">
+                                  <object class="AdwHeaderBar">
+                                    <property name="show-start-title-buttons">False</property>
+                                    <property name="title-widget">
+                                      <object class="AdwWindowTitle">
+                                        <property name="title" translatable="yes">Home</property>
+                                      </object>
+                                    </property>
+                                    <child type="start">
+                                      <object class="GtkToggleButton">
+                                        <property name="icon-name">sidebar-show-symbolic</property>
+                                        <property name="active" bind-source="split_view" bind-property="show-sidebar" bind-flags="sync-create|bidirectional"/>
+                                      </object>
+                                    </child>
+                                    <child type="end">
+                                      <object class="GtkButton">
+                                        <property name="icon-name">list-add-symbolic</property>
+                                        <property name="tooltip-text" translatable="yes">Add Record</property>
+                                        <signal name="clicked" handler="on_add_record_clicked"/>
+                                        <style><class name="suggested-action"/></style>
+                                      </object>
+                                    </child>
+                                    <child type="end">
+                                      <object class="GtkMenuButton">
+                                        <property name="icon-name">open-menu-symbolic</property>
+                                        <property name="menu-model">primary_menu</property>
+                                      </object>
+                                    </child>
+                                  </object>
+                                </child>
+                                <property name="content">
+                                  <object class="GtkScrolledWindow">
+                                    <property name="hscrollbar-policy">never</property>
                                     <child>
-                                      <object class="GtkListBox">
-                                        <property name="selection-mode">none</property>
-                                        <style><class name="boxed-list"/></style>
+                                      <object class="AdwClamp">
+                                        <property name="maximum-size">600</property>
                                         <child>
-                                          <object class="AdwActionRow">
-                                            <property name="title" translatable="yes">Today's Summary</property>
-                                            <property name="subtitle" translatable="yes">Log details and frequencies for today</property>
-                                            <child type="prefix">
-                                              <object class="GtkImage"><property name="icon-name">accessories-calculator-symbolic</property></object>
+                                          <object class="GtkBox">
+                                            <property name="orientation">vertical</property>
+                                            <property name="margin-top">24</property>
+                                            <property name="margin-bottom">32</property>
+                                            <property name="margin-start">24</property>
+                                            <property name="margin-end">24</property>
+                                            <property name="spacing">16</property>
+                                            <child>
+                                              <object class="GtkListBox">
+                                                <property name="selection-mode">none</property>
+                                                <style><class name="boxed-list"/></style>
+                                                <child>
+                                                  <object class="AdwActionRow">
+                                                    <property name="title" translatable="yes">Today's Summary</property>
+                                                    <property name="subtitle" translatable="yes">Log details and frequencies for today</property>
+                                                    <child type="prefix">
+                                                      <object class="GtkImage"><property name="icon-name">accessories-calculator-symbolic</property></object>
+                                                    </child>
+                                                  </object>
+                                                </child>
+                                              </object>
+                                            </child>
+                                            <child>
+                                              <object class="GtkBox" id="dashboard_box">
+                                                <property name="orientation">vertical</property>
+                                                <property name="spacing">16</property>
+                                                <property name="margin-top">8</property>
+                                                <property name="margin-bottom">24</property>
+                                              </object>
                                             </child>
                                           </object>
                                         </child>
                                       </object>
                                     </child>
-                                    <child>
-                                      <object class="GtkBox" id="dashboard_box">
-                                        <property name="orientation">vertical</property>
-                                        <property name="spacing">16</property>
-                                        <property name="margin-top">8</property>
-                                        <property name="margin-bottom">24</property>
-                                      </object>
-                                    </child>
                                   </object>
-                                </child>
+                                </property>
                               </object>
-                            </child>
+                              </property>
                           </object>
-                        </property>
+                        </child>
                       </object>
-                    </property>
+                      </property>
                   </object>
                 </child>
 
@@ -478,54 +490,54 @@
                 </child>
 
                 <child>
-                          <object class="AdwViewStackPage">
-                            <property name="name">personal</property>
-                            <property name="child">
-                              <object class="AdwToolbarView">
-                                <child type="top">
-                                  <object class="AdwHeaderBar">
-                                    <property name="show-start-title-buttons">False</property>
-                                    <property name="title-widget">
-                                      <object class="AdwWindowTitle">
-                                        <property name="title" translatable="yes">Personal</property>
-                                      </object>
-                                    </property>
-                                    <child type="start">
-                                      <object class="GtkToggleButton">
-                                        <property name="icon-name">sidebar-show-symbolic</property>
-                                        <property name="active" bind-source="split_view" bind-property="show-sidebar" bind-flags="sync-create|bidirectional"/>
-                                      </object>
-                                    </child>
-
-                                    <child type="end">
-                                      <object class="GtkMenuButton">
-                                        <property name="icon-name">open-menu-symbolic</property>
-                                        <property name="menu-model">primary_menu</property>
-                                      </object>
-                                    </child>
-                                  </object>
-                                </child>
-                                <property name="content">
-                                  <object class="AdwPreferencesPage">
-                                    <child>
-                                      <object class="AdwPreferencesGroup">
-                                        <property name="title" translatable="yes">Body Metrics</property>
-                                        <property name="description" translatable="yes">Used to accurately calculate Apparent Volume of Distribution (Vd) for your personalized PK curves.</property>
-                                        <child>
-                                          <object class="AdwSpinRow" id="personal_weight_row">
-                                            <property name="title" translatable="yes">Body Weight (kg)</property>
-                                            <property name="numeric">True</property>
-                                            <property name="digits">1</property>
-                                          </object>
-                                        </child>
-                                      </object>
-                                    </child>
-                                  </object>
-                                </property>
+                  <object class="AdwViewStackPage">
+                    <property name="name">personal</property>
+                    <property name="child">
+                      <object class="AdwToolbarView">
+                        <child type="top">
+                          <object class="AdwHeaderBar">
+                            <property name="show-start-title-buttons">False</property>
+                            <property name="title-widget">
+                              <object class="AdwWindowTitle">
+                                <property name="title" translatable="yes">Personal</property>
                               </object>
                             </property>
+                            <child type="start">
+                              <object class="GtkToggleButton">
+                                <property name="icon-name">sidebar-show-symbolic</property>
+                                <property name="active" bind-source="split_view" bind-property="show-sidebar" bind-flags="sync-create|bidirectional"/>
+                              </object>
+                            </child>
+
+                            <child type="end">
+                              <object class="GtkMenuButton">
+                                <property name="icon-name">open-menu-symbolic</property>
+                                <property name="menu-model">primary_menu</property>
+                              </object>
+                            </child>
                           </object>
                         </child>
+                        <property name="content">
+                          <object class="AdwPreferencesPage">
+                            <child>
+                              <object class="AdwPreferencesGroup">
+                                <property name="title" translatable="yes">Body Metrics</property>
+                                <property name="description" translatable="yes">Used to accurately calculate Apparent Volume of Distribution (Vd) for your personalized PK curves.</property>
+                                <child>
+                                  <object class="AdwSpinRow" id="personal_weight_row">
+                                    <property name="title" translatable="yes">Body Weight (kg)</property>
+                                    <property name="numeric">True</property>
+                                    <property name="digits">1</property>
+                                  </object>
+                                </child>
+                              </object>
+                            </child>
+                          </object>
+                        </property>
+                      </object>
+                    </property>
+                  </object>
+                </child>
               </object>
             </property>
 

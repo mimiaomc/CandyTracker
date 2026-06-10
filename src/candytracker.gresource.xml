@@ -10,6 +10,7 @@
     <file preprocess="xml-stripblanks">medication_creator_page.ui</file>
     <file preprocess="xml-stripblanks">pk_setup_page.ui</file>
     <file preprocess="xml-stripblanks">concentration_plot.ui</file>
+    <file preprocess="xml-stripblanks">chart_details_page.ui</file>
     <file>presets.json</file>
   </gresource>
 </gresources>

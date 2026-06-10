@@ -44,6 +44,7 @@ class CandytrackerWindow(Adw.ApplicationWindow):
     toast_overlay = Gtk.Template.Child()
     dashboard_box = Gtk.Template.Child()
     personal_weight_row = Gtk.Template.Child()
+    home_nav_view = Gtk.Template.Child()
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -329,9 +330,17 @@ class CandytrackerWindow(Adw.ApplicationWindow):
             if success:
                 self.sync_weight_from_db()
                 self.load_medications()
+                self.load_dashboard()
                 self.meds_nav_view.pop()
-                self.meds_nav_view.pop()
-                self.toast_overlay.add_toast(Adw.Toast.new(_("Medication '{med_name}' imported!").format(med_name=med_name)))
+
+                if msg == "Deleted":
+                    self.load_history()
+                    self.toast_overlay.add_toast(Adw.Toast.new(_("'{med_name}' removed.").format(med_name=med_name)))
+                elif msg == "HistoryCleared":
+                    self.load_history()
+                    self.toast_overlay.add_toast(Adw.Toast.new(_("History for '{med_name}' cleared.").format(med_name=med_name)))
+                else:
+                    self.toast_overlay.add_toast(Adw.Toast.new(_("Medication '{med_name}' updated!").format(med_name=med_name)))
             else:
                 self.toast_overlay.add_toast(Adw.Toast.new(msg))
 
@@ -419,13 +428,27 @@ class CandytrackerWindow(Adw.ApplicationWindow):
         while self.history_list.get_first_child() is not None:
             self.history_list.remove(self.history_list.get_first_child())
 
+        # 隐藏掉全局的“查看更多”按钮
+        if hasattr(self, 'view_more_button'):
+            self.view_more_button.set_visible(False)
+
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        cursor.execute("SELECT r.id, r.timestamp, r.med_name, r.dose_mg, r.unit, m.icon, r.method FROM records r LEFT JOIN medications m ON r.med_name = m.name ORDER BY datetime(r.timestamp) DESC, r.id DESC LIMIT 11")
-        rows = cursor.fetchall()
+
+        # 多级 SQL 排序
+        # COALESCE(m.sort_order, 9999) ASC: 优先按 Medications 里的自定义排序显示。
+        #    (如果这个药被你删除了变成了“历史存档”，它就没有 sort_order 了，COALESCE 会极其聪明地把它当成 9999 扔到列表最底部的吃灰区！)
+        # datetime(r.timestamp) DESC: 在同一种药的抽屉里，按时间倒序排列。
+        cursor.execute("""
+            SELECT r.id, r.timestamp, r.med_name, r.dose_mg, r.unit, m.icon, r.method
+            FROM records r
+            LEFT JOIN medications m ON r.med_name = m.name
+            ORDER BY COALESCE(m.sort_order, 9999) ASC, datetime(r.timestamp) DESC, r.id DESC
+        """)
+        all_rows = cursor.fetchall()
         conn.close()
 
-        if not rows:
+        if not all_rows:
             self.history_empty_clamp.set_visible(True)
             self.history_scrolled.set_visible(False)
             return
@@ -433,15 +456,69 @@ class CandytrackerWindow(Adw.ApplicationWindow):
         self.history_empty_clamp.set_visible(False)
         self.history_scrolled.set_visible(True)
 
-        if len(rows) > 10:
-            self.view_more_button.set_visible(True)
-            display_rows = rows[:10]
-        else:
-            self.view_more_button.set_visible(False)
-            display_rows = rows
+        # 因为 Python 字典会极其忠实地保留插入顺序，而 SQL 已经帮我们把药物按 sort_order 聚拢在一起了，
+        # 所以这里自然而然就生成了排序完美的字典！
+        grouped_records = {}
+        for row in all_rows:
+            m_name = row[2]
+            if m_name not in grouped_records:
+                grouped_records[m_name] = []
+            grouped_records[m_name].append(row)
 
-        for row in display_rows:
-            self.history_list.append(self.create_action_row_from_db(row))
+        # 为每一种药创建一个“专属抽屉”
+        for med_name, rows in grouped_records.items():
+            # 提取这种药物的图标
+            icon = rows[0][5] if rows[0][5] else "💊"
+
+            # 极其原生的折叠菜单 (ExpanderRow)
+            expander = Adw.ExpanderRow(title=med_name)
+            expander.set_subtitle(_("Total {count} records").format(count=len(rows)))
+            expander.add_prefix(Gtk.Label(label=icon))
+
+            # 抽屉里最多只渲染最近 10 条
+            display_rows = rows[:10]
+
+            for row in display_rows:
+                action_row = self.create_action_row_from_db(row)
+                expander.add_row(action_row)
+
+            # 追加一个“查看全部”的专属弹窗入口
+            if len(rows) > 10:
+                view_more_row = Adw.ActionRow(title=_("View all {count} records...").format(count=len(rows)))
+                view_more_row.set_activatable(True)
+                view_more_row.connect("activated", lambda r, m=med_name, all_r=rows: self.show_med_history_dialog(m, all_r))
+                expander.add_row(view_more_row)
+
+            self.history_list.append(expander)
+
+    def show_med_history_dialog(self, med_name, rows):
+        dialog = Adw.MessageDialog(
+            transient_for=self,
+            heading=_("{med_name} History").format(med_name=med_name),
+            body=_("Full historical log for this medication:")
+        )
+        dialog.add_response("close", _("Close"))
+
+        scrolled = Gtk.ScrolledWindow()
+        scrolled.set_min_content_height(350)
+        scrolled.set_max_content_height(500)
+        scrolled.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+
+        all_history_list = Gtk.ListBox()
+        all_history_list.add_css_class("boxed-list")
+        all_history_list.set_selection_mode(Gtk.SelectionMode.NONE)
+
+        def handle_view_more_click(rid):
+            dialog.destroy()
+            self.show_delete_confirm_dialog(rid)
+
+        # 把这药几百条的记录全塞进去
+        for row in rows:
+            all_history_list.append(self.create_action_row_from_db(row, handle_view_more_click))
+
+        scrolled.set_child(all_history_list)
+        dialog.set_extra_child(scrolled)
+        dialog.present()
 
     def on_sidebar_row_selected(self, listbox, row):
         if row is None: return
@@ -646,7 +723,7 @@ class CandytrackerWindow(Adw.ApplicationWindow):
             plot = ConcentrationPlot()
             plot.update_data(self.db_path, target_substance=sub_name)
 
-            list_box.connect("row-activated", lambda box, row, p=plot: self.show_chart_details(p))
+            list_box.connect("row-activated", lambda box, row, p=plot, sn=sub_name: self.show_chart_details(p, sn))
 
             row = Gtk.ListBoxRow()
             row.set_child(plot)
@@ -679,6 +756,7 @@ class CandytrackerWindow(Adw.ApplicationWindow):
 
         self.load_dashboard()
         self.load_medications()
+        self.load_history()
 
     def refresh_active_charts(self):
         if hasattr(self, 'active_plots'):
@@ -702,36 +780,16 @@ class CandytrackerWindow(Adw.ApplicationWindow):
         conn.close()
 
         self.load_medications()
+        self.load_history()
 
-    def show_chart_details(self, plot):
+    def show_chart_details(self, plot, sub_name):
+        from .chart_details_page import ChartDetailsPage
         points_data, status_msg = plot.get_raw_points_data()
 
-        dialog = Adw.MessageDialog(transient_for=self, heading=_("PK/PD Data"), body=_("Tap a row to copy:"))
-        dialog.add_response("close", _("Close"))
+        page = ChartDetailsPage(sub_name, self.db_path, points_data, status_msg, self)
 
-        if status_msg:
-            dialog.set_body(status_msg)
-        else:
-            scrolled = Gtk.ScrolledWindow(height_request=350, propagate_natural_width=True)
-            list_box = Gtk.ListBox()
-            list_box.add_css_class("boxed-list")
-
-            for dt_str, val_str in reversed(points_data):
-                item_row = Adw.ActionRow(title=dt_str)
-                lbl = Gtk.Label(label=val_str)
-                lbl.add_css_class("dim-label")
-                item_row.add_suffix(lbl)
-                item_row.set_activatable(True)
-
-                copy_text = f"[{dt_str}] Level: {val_str}"
-                item_row.connect("activated", lambda r, txt=copy_text: self.copy_to_clipboard(txt))
-
-                list_box.append(item_row)
-
-            scrolled.set_child(list_box)
-            dialog.set_extra_child(scrolled)
-
-        dialog.present()
+        # 推送到 Home 的专属导航栈里
+        self.home_nav_view.push(page)
 
     def copy_to_clipboard(self, text):
         from gi.repository import Gdk
