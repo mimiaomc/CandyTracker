@@ -174,10 +174,13 @@ class ConcentrationPlot(Gtk.Box):
                     route_pk = route_pk.get(site_name, {})
                 
                 if method == "Transdermal Patch":
-                    try:
-                        route_pk["wear_hours"] = float(site)
-                    except (ValueError, TypeError):
-                        pass
+                    if site:
+                        if site.startswith("ended:") or site.startswith("active:"):
+                            try: route_pk["wear_hours"] = float(site.split(":")[1])
+                            except ValueError: pass
+                        else:
+                            try: route_pk["wear_hours"] = float(site)
+                            except ValueError: pass
 
                 parsed_records.append({
                     "ts": rec_ts,
@@ -196,19 +199,7 @@ class ConcentrationPlot(Gtk.Box):
         # 智能路由分拣
         euler_records = [r for r in parsed_records if r["pk"].get("model") == "3_compartment"]
         patch_records = [r for r in parsed_records if r["pk"].get("model") == "patch_zero_order"]
-        bateman_records = [r for r in parsed_records if r["pk"].get("model") not in ("3_compartment", "patch_zero_order") and r["method"] != "Patch Remove"]
-        patch_removes = [r for r in parsed_records if r["method"] == "Patch Remove"]
-
-        # 事件配对：计算真实贴片佩戴时长
-        for pr in patch_records:
-            pr_med = pr["med"]
-            pr_ts = pr["ts"]
-            expected = pr["pk"].get("wear_hours", 84.0)
-            for remove_rec in patch_removes:
-                if remove_rec["med"] == pr_med and remove_rec["ts"] > pr_ts:
-                    actual = (remove_rec["ts"] - pr_ts) / 3600.0
-                    pr["pk"]["wear_hours"] = min(expected, actual)
-                    break
+        bateman_records = [r for r in parsed_records if r["pk"].get("model") not in ("3_compartment", "patch_zero_order")]
 
         # 三室模型必须从有史以来第一针开始积分，以累计深外周室（脂肪）里的药量
         integration_start = start_sim
@@ -300,7 +291,7 @@ class ConcentrationPlot(Gtk.Box):
                     release_rate = route_pk.get("release_rate", 50.0) # µg/day
                     patch_scale = route_pk.get("patch_scale", 1.0)
                     
-                    k3 = 0.41 # default generic clearance
+                    k3 = 0.041 # default generic clearance
                     rate_mg_h = (release_rate / 1000.0 / 24.0) * patch_scale * rec["dose"]
                     
                     if delta_hours <= wear_hours:

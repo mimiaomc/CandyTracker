@@ -8,13 +8,14 @@ import os
 import sqlite3
 import json
 import sys
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone, timedelta, date
 from gi.repository import Adw, GLib, Gtk, Gio
 
 from .add_record_dialog import AddRecordDialog
 from .preferences_window import PreferencesWindow
 from .medication_creator_page import MedicationCreatorPage
 from .concentration_plot import ConcentrationPlot
+from .candy_calendar import CandyCalendar
 
 # ==============================================================================
 __TRANSLATION_ANCHORS = [
@@ -55,6 +56,7 @@ class CandytrackerWindow(Adw.ApplicationWindow):
 
         self.my_active_meds = []
         self.meds_allowed_map = {}
+        self.active_patch_widgets = []
 
         self.preset_methods = ["Oral", "Sublingual", "Transdermal Gel", "Transdermal Patch", "Injection"]
         self.preset_units = ["mg", "g", "ml", "patch", "drop"]
@@ -740,6 +742,7 @@ class CandytrackerWindow(Adw.ApplicationWindow):
 
         from .concentration_plot import ConcentrationPlot
         self.active_plots = []
+        self.active_patch_widgets = []
 
         for sub_name in subs:
             group = Adw.PreferencesGroup()
@@ -786,44 +789,32 @@ class CandytrackerWindow(Adw.ApplicationWindow):
             last_patch = patch_cursor.fetchone()
             if last_patch:
                 apply_time, site_str, pk_json, patch_med_name, patch_rec_id = last_patch
-                patch_cursor.execute("""
-                    SELECT 1 FROM records
-                    WHERE med_name = ? AND method = 'Patch Remove' AND timestamp > ?
-                """, (patch_med_name, apply_time))
-                has_remove = patch_cursor.fetchone()
-                
-                if not has_remove:
+                if site_str and site_str.startswith("active:"):
                     try:
                         apply_dt = datetime.strptime(apply_time, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
                         now_dt = datetime.now(timezone.utc)
                         delta_hours = (now_dt - apply_dt).total_seconds() / 3600.0
                         
-                        pk_data = json.loads(pk_json)
-                        route_pk = pk_data.get("Transdermal Patch", {})
-                        expected_wear = route_pk.get("wear_hours", 84.0)
-                        if site_str:
-                            try:
-                                expected_wear = float(site_str)
-                            except ValueError: pass
+                        expected_wear = float(site_str.split(":")[1])
                         
-                        if 0 < delta_hours < expected_wear:
-                            patch_row = Adw.ActionRow(title=_("Wearing: ") + patch_med_name, subtitle=f"{delta_hours:.1f}h / {expected_wear:.1f}h")
-                            patch_row.set_activatable(True)
-                            
-                            progress = Gtk.ProgressBar(fraction=min(delta_hours / expected_wear, 1.0))
-                            progress.set_valign(Gtk.Align.CENTER)
-                            progress.set_margin_start(12)
-                            
-                            box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
-                            box.append(progress)
-                            patch_row.add_suffix(box)
-                            
-                            # Disconnect old handler to override activation behavior
-                            def on_patch_row_activated(r, p_med=patch_med_name):
-                                self.prompt_end_patch(p_med)
-                            patch_row.connect("activated", on_patch_row_activated)
-                            
-                            list_box.append(patch_row)
+                        patch_row = Adw.ActionRow(title=_("Wearing: ") + patch_med_name, subtitle=f"{delta_hours:.1f}h / {expected_wear:.1f}h")
+                        patch_row.set_activatable(True)
+                        
+                        progress = Gtk.ProgressBar(fraction=min(delta_hours / expected_wear, 1.0))
+                        progress.set_valign(Gtk.Align.CENTER)
+                        progress.set_margin_start(12)
+                        
+                        box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+                        box.append(progress)
+                        patch_row.add_suffix(box)
+                        
+                        def on_patch_row_activated(r, p_rec_id=patch_rec_id, p_med=patch_med_name, p_time=apply_time):
+                            self.prompt_end_patch(p_rec_id, p_med, p_time)
+                        patch_row.connect("activated", on_patch_row_activated)
+                        
+                        self.active_patch_widgets.append((patch_row, progress, apply_time, expected_wear))
+                        
+                        list_box.append(patch_row)
                     except Exception as e:
                         print(e)
             patch_conn.close()
@@ -833,28 +824,84 @@ class CandytrackerWindow(Adw.ApplicationWindow):
             self.dashboard_box.append(group)
             self.active_plots.append((plot, sub_name))
 
-    def prompt_end_patch(self, med_name):
+    def prompt_end_patch(self, patch_rec_id, med_name, apply_time):
         dialog = Adw.MessageDialog(
             transient_for=self,
             heading=_("End Patch Wear?"),
-            body=_("是否提前结束当前贴片的佩戴？")
+            body=_("Select the exact time the patch was removed.")
         )
         dialog.add_response("cancel", _("Cancel"))
         dialog.add_response("end", _("End Wear"))
-        dialog.set_response_appearance("end", Adw.ResponseAppearance.DESTRUCTIVE)
+        dialog.set_response_appearance("end", Adw.ResponseAppearance.SUGGESTED)
+        
+        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        
+        hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        
+        date_button = Gtk.MenuButton(hexpand=True, icon_name="pan-down-symbolic", always_show_arrow=True)
+        popover = Gtk.Popover()
+        cal_container = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        popover.set_child(cal_container)
+        date_button.set_popover(popover)
+        
+        candy_cal = CandyCalendar()
+        cal_container.append(candy_cal)
+        
+        now_local = datetime.now()
+        state = {"selected_date": now_local.date()}
+        
+        def update_date_lbl(d):
+            state["selected_date"] = d
+            date_button.set_label(d.strftime("%Y-%m-%d"))
+            
+        update_date_lbl(state["selected_date"])
+        
+        def on_cal_selected(c, y, m, d):
+            update_date_lbl(date(y, m, d))
+            popover.popdown()
+            
+        candy_cal.connect("date-selected", on_cal_selected)
+        
+        hours = [f"{i:02d}" for i in range(24)]
+        mins = [f"{i:02d}" for i in range(60)]
+        hour_dd = Gtk.DropDown()
+        hour_dd.set_model(Gtk.StringList.new(hours))
+        min_dd = Gtk.DropDown()
+        min_dd.set_model(Gtk.StringList.new(mins))
+        hour_dd.set_selected(now_local.hour)
+        min_dd.set_selected(now_local.minute)
+        
+        hbox.append(date_button)
+        hbox.append(Gtk.Label(label=" "))
+        hbox.append(hour_dd)
+        hbox.append(Gtk.Label(label=":"))
+        hbox.append(min_dd)
+        
+        vbox.append(hbox)
+        dialog.set_extra_child(vbox)
         
         def on_response(d, response_id):
             if response_id == "end":
-                now_utc = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+                sel_date = state["selected_date"]
+                h = hour_dd.get_selected()
+                m = min_dd.get_selected()
+                local_dt = datetime(sel_date.year, sel_date.month, sel_date.day, h, m, 0, 0)
+                now_utc = local_dt.astimezone(timezone.utc)
+                
+                apply_dt = datetime.strptime(apply_time, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+                if now_utc <= apply_dt:
+                    self.toast_overlay.add_toast(Adw.Toast.new(_("Error: Removal time cannot be before application time!")))
+                    return
+                    
+                actual_hours = (now_utc - apply_dt).total_seconds() / 3600.0
                 conn = sqlite3.connect(self.db_path)
                 cursor = conn.cursor()
-                cursor.execute("INSERT INTO records (timestamp, med_name, method, dose_mg, unit) VALUES (?, ?, ?, ?, ?)",
-                               (now_utc, med_name, "Patch Remove", 0, "patch"))
+                cursor.execute("UPDATE records SET site = ? WHERE id = ?", (f"ended:{actual_hours:.1f}", patch_rec_id))
                 conn.commit()
                 conn.close()
                 self.load_history()
                 self.load_dashboard()
-                self.toast_overlay.add_toast(Adw.Toast.new(_("Patch removed.")))
+                self.toast_overlay.add_toast(Adw.Toast.new(_("Patch state saved.")))
                 
         dialog.connect("response", on_response)
         dialog.present()
@@ -887,6 +934,23 @@ class CandytrackerWindow(Adw.ApplicationWindow):
         if hasattr(self, 'active_plots'):
             for plot, m_name in self.active_plots:
                 plot.update_data(self.db_path, m_name)
+                
+        if hasattr(self, 'active_patch_widgets'):
+            alive_widgets = []
+            now_dt = datetime.now(timezone.utc)
+            for row, prog, a_time, exp in self.active_patch_widgets:
+                if not row.get_parent(): continue
+                a_dt = datetime.strptime(a_time, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+                dh = (now_dt - a_dt).total_seconds() / 3600.0
+                if dh >= exp:
+                    row.set_subtitle(f"{exp:.1f}h / {exp:.1f}h")
+                    prog.set_fraction(1.0)
+                else:
+                    row.set_subtitle(f"{dh:.1f}h / {exp:.1f}h")
+                    prog.set_fraction(dh / exp)
+                    alive_widgets.append((row, prog, a_time, exp))
+            self.active_patch_widgets = alive_widgets
+            
         return True
 
     def move_med(self, med_id, direction):

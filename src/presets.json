@@ -40,7 +40,7 @@
     "track_mode": "half_life"
   },
   {
-    "name": "Estradiol Patch 50",
+    "name": "Estradiol Patch",
     "substance": "Estradiol",
     "default_method": "Transdermal Patch",
     "unit": "patch",
@@ -50,7 +50,7 @@
       "Transdermal Patch": {
         "model": "patch_zero_order",
         "wear_hours": 84.0,
-        "release_rate": 50.0,
+        "release_rate": 100.0,
         "patch_scale": 1.0,
         "default_dose": 1.0,
         "unit": "patch"

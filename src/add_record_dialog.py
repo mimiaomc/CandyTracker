@@ -145,7 +145,7 @@ class AddRecordDialog(Adw.MessageDialog):
             if site_idx != Gtk.INVALID_LIST_POSITION and site_idx < len(self.current_available_sites):
                 actual_site = self.current_available_sites[site_idx]
         elif actual_method == "Transdermal Patch":
-            actual_site = str(self.patch_wear_spin.get_value())
+            actual_site = f"active:{self.patch_wear_spin.get_value():.1f}"
 
         dose = self.dose_spin.get_value()
         unit = self.preset_units[self.unit_dropdown.get_selected()]

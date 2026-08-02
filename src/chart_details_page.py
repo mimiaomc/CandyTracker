@@ -53,6 +53,16 @@ class ChartDetailsPage(Adw.NavigationPage):
         self._timer_id = GLib.timeout_add_seconds(60, self.refresh_dynamic_data)
 
 
+    def copy_to_clipboard(self, text):
+        from gi.repository import Gdk, GObject
+        clipboard = Gdk.Display.get_default().get_clipboard()
+        # GTK4 compatibility: some versions don't have set_text bound directly
+        try:
+            clipboard.set_text(text)
+        except AttributeError:
+            clipboard.set_content(Gdk.ContentProvider.new_for_value(text))
+        self.main_window.toast_overlay.add_toast(Adw.Toast.new(_("Copied to clipboard.")))
+
     def refresh_dynamic_data(self):
         # 让图表重新从 SQLite 抓取数据并刷新画布
         self.plot.update_data(self.db_path, self.substance_name)

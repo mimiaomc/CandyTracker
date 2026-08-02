@@ -112,7 +112,7 @@ class MedicationCreatorPage(Adw.NavigationPage):
                 self.pk_data_dict[m] = {site: {"half_life": 12.0, "bio": 5.0, "peak": 2.0, "default_dose": 2.0, "unit": "mg"} for site in self.transdermal_sites}
                 self.enabled_transdermal_sites = set(self.transdermal_sites)
             elif m == "Transdermal Patch":
-                self.pk_data_dict[m] = {"model": "patch_zero_order", "wear_hours": 84.0, "release_rate": 50.0, "patch_scale": 1.0, "default_dose": 1.0, "unit": "patch"}
+                self.pk_data_dict[m] = {"model": "patch_zero_order", "wear_hours": 84.0, "release_rate": 100.0, "patch_scale": 1.0, "default_dose": 1.0, "unit": "patch"}
             else:
                 self.pk_data_dict[m] = {"half_life": 12.0, "bio": 5.0, "peak": 2.0, "default_dose": 2.0, "unit": "mg"}
 
