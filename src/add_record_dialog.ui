@@ -31,6 +31,12 @@
                 <property name="tooltip-text" translatable="yes">Administration Route</property>
               </object>
             </child>
+            <child>
+              <object class="GtkDropDown" id="site_dropdown">
+                <property name="tooltip-text" translatable="yes">Application Site</property>
+                <property name="visible">False</property>
+              </object>
+            </child>
           </object>
         </child>
 

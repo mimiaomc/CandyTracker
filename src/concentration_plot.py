@@ -76,7 +76,7 @@ class ConcentrationPlot(Gtk.Box):
                         total_dose += d_mg
                         if ts < oldest_ts: oldest_ts = ts
                         has_records = True
-                except: continue
+                except Exception: continue
 
             if has_records:
                 now_date = now.date()
@@ -95,7 +95,7 @@ class ConcentrationPlot(Gtk.Box):
                         if isinstance(v, dict) and "default_dose" in v:
                             self.pd_target_dose = v["default_dose"]
                             break
-                except: continue
+                except Exception: continue
 
             self.pd_title.set_text(_("{substance} - 7-Day Average").format(substance=_(target_substance)))
             percentage = min(self.pd_avg_dose / max(self.pd_target_dose, 0.01), 1.0)
@@ -124,18 +124,25 @@ class ConcentrationPlot(Gtk.Box):
                     self.target_min = pk["global_target_min"]
                     self.target_max = pk["global_target_max"]
                     self.target_unit = pk.get("global_target_unit", "pg/mL")
-            except: meds_pk[r[0]] = {}
+            except Exception: meds_pk[r[0]] = {}
 
         now = datetime.now(timezone.utc)
 
         # 120 天绝对足够让三室模型的脂肪储库完美达到稳态
         burn_in_limit = (now - timedelta(days=120)).strftime("%Y-%m-%d %H:%M:%S")
 
-        cursor.execute(
-            "SELECT timestamp, med_name, dose_mg, method FROM records "
-            "WHERE substance = ? AND timestamp >= ? ORDER BY timestamp ASC",
-            (target_substance, burn_in_limit)
-        )
+        try:
+            cursor.execute(
+                "SELECT timestamp, med_name, dose_mg, method, site FROM records "
+                "WHERE substance = ? AND timestamp >= ? ORDER BY timestamp ASC",
+                (target_substance, burn_in_limit)
+            )
+        except sqlite3.OperationalError:
+            cursor.execute(
+                "SELECT timestamp, med_name, dose_mg, method, NULL as site FROM records "
+                "WHERE substance = ? AND timestamp >= ? ORDER BY timestamp ASC",
+                (target_substance, burn_in_limit)
+            )
         records = cursor.fetchall()
         conn.close()
 
@@ -157,18 +164,24 @@ class ConcentrationPlot(Gtk.Box):
     def _calc_mixed_models(self, records, meds_pk, user_weight, start_sim, end_sim):
         parsed_records = []
         has_valid_records = False
-        for rec_time_str, m_name, dose, method in records:
+        for rec_time_str, m_name, dose, method, site in records:
             try:
                 rec_ts = datetime.strptime(rec_time_str, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc).timestamp()
+                
+                route_pk = meds_pk.get(m_name, {}).get(method, {})
+                if method == "Transdermal" and "half_life" not in route_pk:
+                    site_name = site if site else "Arm"
+                    route_pk = route_pk.get(site_name, {})
+
                 parsed_records.append({
                     "ts": rec_ts,
                     "dose": dose,
-                    "pk": meds_pk.get(m_name, {}).get(method, {})
+                    "pk": route_pk
                 })
                 # 只要存在未超出渲染末尾期限的数据，就说明图表里有东西画
                 if rec_ts <= end_sim:
                     has_valid_records = True
-            except: pass
+            except Exception: pass
 
         parsed_records.sort(key=lambda x: x["ts"])
 

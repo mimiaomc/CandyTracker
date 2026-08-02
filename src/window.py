@@ -184,6 +184,10 @@ class CandytrackerWindow(Adw.ApplicationWindow):
         cursor = conn.cursor()
 
         cursor.execute("CREATE TABLE IF NOT EXISTS records (id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT NOT NULL, med_name TEXT, substance TEXT DEFAULT 'Unknown', dose_mg REAL, unit TEXT, method TEXT)")
+        try:
+            cursor.execute("ALTER TABLE records ADD COLUMN site TEXT DEFAULT NULL")
+        except sqlite3.OperationalError:
+            pass
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS medications (
                 id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, substance TEXT DEFAULT 'Unknown', default_method TEXT,
@@ -196,6 +200,7 @@ class CandytrackerWindow(Adw.ApplicationWindow):
         cursor.execute("INSERT OR IGNORE INTO preferences (key, value) VALUES ('auto_jump_history', '0')")
         cursor.execute("INSERT OR IGNORE INTO preferences (key, value) VALUES ('eula_agreed', '0')")
         cursor.execute("INSERT OR IGNORE INTO preferences (key, value) VALUES ('user_weight', '')")
+        cursor.execute("INSERT OR IGNORE INTO preferences (key, value) VALUES ('transdermal_sites', '[\"Arm\", \"Inner Thigh\", \"Scrotal\"]')")
 
         conn.commit()
         conn.close()
@@ -612,17 +617,28 @@ class CandytrackerWindow(Adw.ApplicationWindow):
             error_dialog.present()
             return
 
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+        c.execute("SELECT value FROM preferences WHERE key = 'transdermal_sites'")
+        row = c.fetchone()
+        conn.close()
+        try:
+            transdermal_sites = json.loads(row[0]) if row and row[0] else ["Arm", "Inner Thigh", "Scrotal"]
+        except Exception:
+            transdermal_sites = ["Arm", "Inner Thigh", "Scrotal"]
+
         dialog = AddRecordDialog(
             active_meds=self.my_active_meds,
             meds_allowed_map=self.meds_allowed_map,
             meds_pk_map=self.meds_pk_map,
             preset_units=self.preset_units,
+            transdermal_sites=transdermal_sites,
             transient_for=self
         )
 
         def on_response(dialog_window, response_id):
             if response_id == "save":
-                med_name, actual_method, dose, unit, utc_str = dialog_window.get_record_data()
+                med_name, actual_method, actual_site, dose, unit, utc_str = dialog_window.get_record_data()
 
                 conn = sqlite3.connect(self.db_path)
                 cursor = conn.cursor()
@@ -632,8 +648,8 @@ class CandytrackerWindow(Adw.ApplicationWindow):
                 substance = sub_row[0] if sub_row else "Unknown"
 
                 cursor.execute(
-                    "INSERT INTO records (timestamp, med_name, substance, dose_mg, unit, method) VALUES (?, ?, ?, ?, ?, ?)",
-                    (utc_str, med_name, substance, dose, unit, actual_method)
+                    "INSERT INTO records (timestamp, med_name, substance, dose_mg, unit, method, site) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (utc_str, med_name, substance, dose, unit, actual_method, actual_site)
                 )
                 conn.commit()
                 conn.close()

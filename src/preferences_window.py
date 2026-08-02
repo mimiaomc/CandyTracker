@@ -1,5 +1,6 @@
 # preferences_window.py
 import sqlite3
+import json
 import gi
 from gi.repository import Adw, Gtk
 
@@ -9,6 +10,7 @@ class PreferencesWindow(Adw.PreferencesWindow):
 
     clear_records_btn = Gtk.Template.Child()
     jump_switch = Gtk.Template.Child()
+    sites_entry_row = Gtk.Template.Child()
 
     def __init__(self, main_window, db_path, **kwargs):
         super().__init__(**kwargs)
@@ -19,7 +21,17 @@ class PreferencesWindow(Adw.PreferencesWindow):
         cursor = conn.cursor()
         cursor.execute("SELECT value FROM preferences WHERE key = 'auto_jump_history'")
         val = cursor.fetchone()
+        
+        cursor.execute("SELECT value FROM preferences WHERE key = 'transdermal_sites'")
+        val_sites = cursor.fetchone()
         conn.close()
+
+        if val_sites and val_sites[0]:
+            try:
+                sites_list = json.loads(val_sites[0])
+                self.sites_entry_row.set_text(", ".join(sites_list))
+            except Exception:
+                pass
 
         self.jump_switch.set_active(val is not None and val[0] == '1')
 
@@ -31,6 +43,22 @@ class PreferencesWindow(Adw.PreferencesWindow):
             c.close()
 
         self.jump_switch.connect("notify::active", on_switch_changed)
+
+    @Gtk.Template.Callback()
+    def on_sites_applied(self, entry_row):
+        text = entry_row.get_text()
+        sites_list = [s.strip() for s in text.split(",") if s.strip()]
+        if not sites_list:
+            sites_list = ["Arm", "Inner Thigh", "Scrotal"] # Fallback
+            
+        json_str = json.dumps(sites_list)
+        
+        conn = sqlite3.connect(self.db_path)
+        conn.execute("UPDATE preferences SET value = ? WHERE key = 'transdermal_sites'", (json_str,))
+        conn.commit()
+        conn.close()
+        
+        self.main_window.toast_overlay.add_toast(Adw.Toast.new(_("Transdermal sites updated.")))
 
     @Gtk.Template.Callback()
     def on_clear_records_clicked(self, button):

@@ -32,6 +32,19 @@
 
         <child>
           <object class="AdwPreferencesGroup">
+            <property name="title" translatable="yes">Medication Settings</property>
+            <child>
+              <object class="AdwEntryRow" id="sites_entry_row">
+                <property name="title" translatable="yes">Transdermal Sites (comma separated)</property>
+                <property name="show-apply-button">True</property>
+                <signal name="apply" handler="on_sites_applied"/>
+              </object>
+            </child>
+          </object>
+        </child>
+
+        <child>
+          <object class="AdwPreferencesGroup">
             <property name="title" translatable="yes">Data Management</property>
             <property name="description" translatable="yes">Manage your tracker's database.</property>
             <child>

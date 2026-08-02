@@ -5,6 +5,48 @@ from gi.repository import Adw, Gtk
 
 from .pk_setup_page import PkSetupPage
 
+class TransdermalSitesPage(Adw.NavigationPage):
+    def __init__(self, sites, pk_data_dict, preset_units, current_mode, nav_view, enabled_sites_set, **kwargs):
+        super().__init__(**kwargs)
+        self.set_title(_("Transdermal Sites"))
+        
+        toolbar_view = Adw.ToolbarView()
+        header_bar = Adw.HeaderBar()
+        toolbar_view.add_top_bar(header_bar)
+        
+        pref_page = Adw.PreferencesPage()
+        group = Adw.PreferencesGroup(title=_("Application Sites"))
+        pref_page.add(group)
+        
+        toolbar_view.set_content(pref_page)
+        self.set_child(toolbar_view)
+        
+        for site in sites:
+            row = Adw.ActionRow(title=_(site))
+            row.set_activatable(True)
+            
+            check = Gtk.CheckButton(valign=Gtk.Align.CENTER)
+            check.set_active(site in enabled_sites_set)
+            
+            def on_check_toggled(btn, s=site):
+                if btn.get_active():
+                    enabled_sites_set.add(s)
+                else:
+                    enabled_sites_set.discard(s)
+            check.connect("toggled", on_check_toggled)
+            
+            row.add_prefix(check)
+            row.add_suffix(Gtk.Image(icon_name="go-next-symbolic"))
+            
+            if site not in pk_data_dict:
+                pk_data_dict[site] = {"half_life": 12.0, "bio": 5.0, "peak": 2.0, "default_dose": 2.0, "unit": "mg"}
+            
+            row.connect("activated", lambda r, s=site: nav_view.push(
+                PkSetupPage(s, pk_data_dict[s], preset_units, current_mode)
+            ))
+            group.add(row)
+
+
 @Gtk.Template(resource_path="/com/github/mimiaomc/candytracker/medication_creator_page.ui")
 class MedicationCreatorPage(Adw.NavigationPage):
     __gtype_name__ = "MedicationCreatorPage"
@@ -35,6 +77,18 @@ class MedicationCreatorPage(Adw.NavigationPage):
         self.pk_data_dict = {}
         self.method_checks = {}
 
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+        c.execute("SELECT value FROM preferences WHERE key = 'transdermal_sites'")
+        row = c.fetchone()
+        conn.close()
+        try:
+            self.transdermal_sites = json.loads(row[0]) if row and row[0] else ["Arm", "Inner Thigh", "Scrotal"]
+        except Exception:
+            self.transdermal_sites = ["Arm", "Inner Thigh", "Scrotal"]
+        
+        self.enabled_transdermal_sites = set()
+
         self.craft_button.connect("clicked", self.on_craft_clicked)
         self.creator_icon_row.set_model(Gtk.StringList.new([_("{icon} Style").format(icon=i) for i in self.preset_icons]))
         self.track_modes = [_("Pharmacokinetics (PK)"), _("Pharmacodynamics (PD)")]
@@ -54,7 +108,11 @@ class MedicationCreatorPage(Adw.NavigationPage):
         on_mode_changed()
 
         for m in self.preset_methods:
-            self.pk_data_dict[m] = {"half_life": 12.0, "bio": 5.0, "peak": 2.0, "default_dose": 2.0, "unit": "mg"}
+            if m == "Transdermal":
+                self.pk_data_dict[m] = {site: {"half_life": 12.0, "bio": 5.0, "peak": 2.0, "default_dose": 2.0, "unit": "mg"} for site in self.transdermal_sites}
+                self.enabled_transdermal_sites = set(self.transdermal_sites)
+            else:
+                self.pk_data_dict[m] = {"half_life": 12.0, "bio": 5.0, "peak": 2.0, "default_dose": 2.0, "unit": "mg"}
 
         for m in self.preset_methods:
             row = Adw.ActionRow(title=_(m))
@@ -96,9 +154,17 @@ class MedicationCreatorPage(Adw.NavigationPage):
                     if m in ["global_target_min", "global_target_max", "global_target_unit"]:
                         continue
                     if isinstance(data, dict):
-                        if "default_dose" not in data: data["default_dose"] = 2.0
-                        if "unit" not in data: data["unit"] = unit if unit else "mg"
-                        self.pk_data_dict[m] = data
+                        if m == "Transdermal":
+                            if "half_life" in data: # Legacy format
+                                self.pk_data_dict[m] = {site: data.copy() for site in self.transdermal_sites}
+                                self.enabled_transdermal_sites = set(self.transdermal_sites)
+                            else:
+                                self.pk_data_dict[m] = data
+                                self.enabled_transdermal_sites = set(data.keys())
+                        else:
+                            if "default_dose" not in data: data["default_dose"] = 2.0
+                            if "unit" not in data: data["unit"] = unit if unit else "mg"
+                            self.pk_data_dict[m] = data
         else:
             if self.preset_methods:
                 self.method_checks[self.preset_methods[0]].set_active(True)
@@ -112,8 +178,12 @@ class MedicationCreatorPage(Adw.NavigationPage):
 
     def on_route_activated(self, route_name):
         current_mode = "dosage" if self.track_mode_row.get_selected() == 1 else "half_life"
-        page = PkSetupPage(route_name, self.pk_data_dict[route_name], self.preset_units, current_mode)
-        self.nav_view.push(page)
+        if route_name == "Transdermal":
+            page = TransdermalSitesPage(self.transdermal_sites, self.pk_data_dict["Transdermal"], self.preset_units, current_mode, self.nav_view, self.enabled_transdermal_sites)
+            self.nav_view.push(page)
+        else:
+            page = PkSetupPage(route_name, self.pk_data_dict[route_name], self.preset_units, current_mode)
+            self.nav_view.push(page)
 
     def on_craft_clicked(self, button):
         name = self.creator_name_row.get_text().strip()
@@ -131,14 +201,36 @@ class MedicationCreatorPage(Adw.NavigationPage):
         icon = self.preset_icons[self.creator_icon_row.get_selected()]
         track_mode = "dosage" if self.track_mode_row.get_selected() == 1 else "half_life"
 
-        final_pk_data = {m: self.pk_data_dict[m] for m in allowed}
+        final_pk_data = {}
+        for m in allowed:
+            if m == "Transdermal":
+                enabled_sites = {}
+                for site in self.enabled_transdermal_sites:
+                    if site not in self.pk_data_dict["Transdermal"]:
+                        self.pk_data_dict["Transdermal"][site] = {"half_life": 12.0, "bio": 5.0, "peak": 2.0, "default_dose": 2.0, "unit": "mg"}
+                    enabled_sites[site] = self.pk_data_dict["Transdermal"][site]
+                
+                if not enabled_sites and self.transdermal_sites:
+                    fallback = self.transdermal_sites[0]
+                    enabled_sites[fallback] = self.pk_data_dict["Transdermal"].get(fallback, {"half_life": 12.0, "bio": 5.0, "peak": 2.0, "default_dose": 2.0, "unit": "mg"})
+                    
+                final_pk_data[m] = enabled_sites
+            else:
+                final_pk_data[m] = self.pk_data_dict[m]
 
         if track_mode == "half_life":
             final_pk_data["global_target_min"] = self.target_min_row.get_value()
             final_pk_data["global_target_max"] = self.target_max_row.get_value()
             final_pk_data["global_target_unit"] = self.target_units[self.target_unit_row.get_selected()]
 
-        global_fallback_unit = final_pk_data[allowed[0]]["unit"] if allowed[0] in final_pk_data else "mg"
+        global_fallback_unit = "mg"
+        if allowed:
+            first_method = allowed[0]
+            if first_method == "Transdermal":
+                if self.transdermal_sites and self.transdermal_sites[0] in final_pk_data["Transdermal"]:
+                    global_fallback_unit = final_pk_data["Transdermal"][self.transdermal_sites[0]].get("unit", "mg")
+            else:
+                global_fallback_unit = final_pk_data[first_method].get("unit", "mg")
 
         # 如果是 PK 模式，必须拦截检查体重
         if track_mode == "half_life":
