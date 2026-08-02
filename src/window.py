@@ -21,7 +21,7 @@ from .candy_calendar import CandyCalendar
 __TRANSLATION_ANCHORS = [
     _("Estrogel"), _("Progynova"), _("Androcur"),
     _("Estradiol"), _("Cyproterone Acetate"),
-    _("Estradiol Valerate"),
+    _("Estradiol Valerate"), _("Estradiol Patch"),
     _("Oral"), _("Sublingual"), _("Transdermal Gel"), _("Transdermal Patch"), _("Injection"),
     _("Arm"), _("Inner Thigh"), _("Scrotal")
 ]
