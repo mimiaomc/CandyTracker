@@ -39,6 +39,34 @@
             </child>
           </object>
         </child>
+        <child>
+          <object class="GtkBox" id="patch_wear_box">
+            <property name="orientation">horizontal</property>
+            <property name="spacing">8</property>
+            <property name="visible">False</property>
+            <child>
+              <object class="GtkLabel">
+                <property name="label" translatable="yes">Expected Wear Time (h):</property>
+                <property name="hexpand">True</property>
+                <property name="halign">start</property>
+              </object>
+            </child>
+            <child>
+              <object class="GtkSpinButton" id="patch_wear_spin">
+                <property name="digits">1</property>
+                <property name="numeric">True</property>
+                <property name="adjustment">
+                  <object class="GtkAdjustment">
+                    <property name="value">84.0</property>
+                    <property name="lower">1.0</property>
+                    <property name="upper">500.0</property>
+                    <property name="step-increment">1.0</property>
+                  </object>
+                </property>
+              </object>
+            </child>
+          </object>
+        </child>
 
         <child>
           <object class="GtkBox">

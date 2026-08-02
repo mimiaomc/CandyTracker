@@ -9,6 +9,7 @@ class PkSetupPage(Adw.NavigationPage):
     advanced_model_switch = Gtk.Template.Child()
     standard_pk_group = Gtk.Template.Child()
     advanced_pk_group = Gtk.Template.Child()
+    patch_pk_group = Gtk.Template.Child()
 
     # 单室参数
     spin_half_life = Gtk.Template.Child()
@@ -21,6 +22,11 @@ class PkSetupPage(Adw.NavigationPage):
     spin_k_cf = Gtk.Template.Child()
     spin_k_fc = Gtk.Template.Child()
     spin_vd = Gtk.Template.Child()
+
+    # 贴片参数
+    spin_patch_wear = Gtk.Template.Child()
+    spin_patch_rate = Gtk.Template.Child()
+    spin_patch_scale = Gtk.Template.Child()
 
     # 通用参数
     spin_dose = Gtk.Template.Child()
@@ -45,20 +51,35 @@ class PkSetupPage(Adw.NavigationPage):
         self.spin_k_fc.set_adjustment(Gtk.Adjustment(value=0.01, lower=0.001, upper=10.0, step_increment=0.001))
         self.spin_vd.set_adjustment(Gtk.Adjustment(value=1.5, lower=1.0, upper=500.0, step_increment=1.0))
 
+        self.spin_patch_wear.set_adjustment(Gtk.Adjustment(value=84.0, lower=1.0, upper=500.0, step_increment=1.0))
+        self.spin_patch_rate.set_adjustment(Gtk.Adjustment(value=50.0, lower=1.0, upper=5000.0, step_increment=5.0))
+        self.spin_patch_scale.set_adjustment(Gtk.Adjustment(value=1.0, lower=0.1, upper=10.0, step_increment=0.1))
+
         self.spin_dose.set_adjustment(Gtk.Adjustment(value=2.0, lower=0.01, upper=10000.0, step_increment=0.5))
 
         # 路由拦截与预填数据
+        self.is_patch = route_name == "Transdermal Patch"
         is_advanced = self.pk_data_ref.get("model") == "3_compartment"
 
         # 如果不是针剂 (Injection / Implant)，那就不显示这个计算模型
         if route_name not in ["Injection", "Implant"]:
             self.model_selection_group.set_visible(False)
             is_advanced = False
-            self.pk_data_ref["model"] = "1_comp"
+            if not self.is_patch:
+                self.pk_data_ref["model"] = "1_comp"
+            else:
+                self.pk_data_ref["model"] = "patch_zero_order"
 
         self.advanced_model_switch.set_active(is_advanced)
-        self.standard_pk_group.set_visible(not is_advanced)
-        self.advanced_pk_group.set_visible(is_advanced)
+        
+        if self.is_patch:
+            self.standard_pk_group.set_visible(False)
+            self.advanced_pk_group.set_visible(False)
+            self.patch_pk_group.set_visible(True)
+        else:
+            self.patch_pk_group.set_visible(False)
+            self.standard_pk_group.set_visible(not is_advanced)
+            self.advanced_pk_group.set_visible(is_advanced)
 
         # 填入单室数据
         self.spin_half_life.set_value(float(self.pk_data_ref.get("half_life", 12.0)))
@@ -71,6 +92,11 @@ class PkSetupPage(Adw.NavigationPage):
         self.spin_k_cf.set_value(float(self.pk_data_ref.get("k_cf", 0.08)))
         self.spin_k_fc.set_value(float(self.pk_data_ref.get("k_fc", 0.015)))
         self.spin_vd.set_value(float(self.pk_data_ref.get("vd", 1.5)))
+        
+        # 填入贴片数据
+        self.spin_patch_wear.set_value(float(self.pk_data_ref.get("wear_hours", 84.0)))
+        self.spin_patch_rate.set_value(float(self.pk_data_ref.get("release_rate", 50.0)))
+        self.spin_patch_scale.set_value(float(self.pk_data_ref.get("patch_scale", 1.0)))
 
         # 填入通用数据
         self.spin_dose.set_value(float(self.pk_data_ref.get("default_dose", 2.0)))
@@ -91,10 +117,15 @@ class PkSetupPage(Adw.NavigationPage):
         self.spin_k_fc.connect("notify::value", self.auto_save)
         self.spin_vd.connect("notify::value", self.auto_save)
 
+        self.spin_patch_wear.connect("notify::value", self.auto_save)
+        self.spin_patch_rate.connect("notify::value", self.auto_save)
+        self.spin_patch_scale.connect("notify::value", self.auto_save)
+
         self.spin_dose.connect("notify::value", self.auto_save)
         self.unit_row.connect("notify::selected", self.auto_save)
 
     def on_model_switched(self, switch, pspec):
+        if self.is_patch: return
         is_advanced = switch.get_active()
         self.standard_pk_group.set_visible(not is_advanced)
         self.advanced_pk_group.set_visible(is_advanced)
@@ -108,7 +139,12 @@ class PkSetupPage(Adw.NavigationPage):
         self.pk_data_ref["default_dose"] = self.spin_dose.get_value()
         self.pk_data_ref["unit"] = self.preset_units[self.unit_row.get_selected()]
 
-        if is_advanced:
+        if self.is_patch:
+            self.pk_data_ref["model"] = "patch_zero_order"
+            self.pk_data_ref["wear_hours"] = self.spin_patch_wear.get_value()
+            self.pk_data_ref["release_rate"] = self.spin_patch_rate.get_value()
+            self.pk_data_ref["patch_scale"] = self.spin_patch_scale.get_value()
+        elif is_advanced:
             self.pk_data_ref["model"] = "3_compartment"
             self.pk_data_ref["k_absorb"] = self.spin_k_absorb.get_value()
             self.pk_data_ref["k_elim"] = self.spin_k_elim.get_value()

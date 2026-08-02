@@ -57,6 +57,34 @@
             </child>
 
             <child>
+              <object class="AdwPreferencesGroup" id="patch_pk_group">
+                <property name="title" translatable="yes">Patch Parameters (Zero-Order)</property>
+                <property name="visible">False</property>
+                <child>
+                  <object class="AdwSpinRow" id="spin_patch_wear">
+                    <property name="title" translatable="yes">Wear Time (Hours)</property>
+                    <property name="numeric">True</property>
+                    <property name="digits">1</property>
+                  </object>
+                </child>
+                <child>
+                  <object class="AdwSpinRow" id="spin_patch_rate">
+                    <property name="title" translatable="yes">Nominal Release Rate (µg/day)</property>
+                    <property name="numeric">True</property>
+                    <property name="digits">1</property>
+                  </object>
+                </child>
+                <child>
+                  <object class="AdwSpinRow" id="spin_patch_scale">
+                    <property name="title" translatable="yes">Bioavailability Multiplier</property>
+                    <property name="numeric">True</property>
+                    <property name="digits">2</property>
+                  </object>
+                </child>
+              </object>
+            </child>
+
+            <child>
               <object class="AdwPreferencesGroup" id="advanced_pk_group">
                 <property name="title" translatable="yes">Advanced Multi-Compartment Parameters</property>
                 <property name="visible">False</property>

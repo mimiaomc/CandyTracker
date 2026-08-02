@@ -13,6 +13,8 @@ class AddRecordDialog(Adw.MessageDialog):
     dose_spin = Gtk.Template.Child()
     unit_dropdown = Gtk.Template.Child()
     site_dropdown = Gtk.Template.Child()
+    patch_wear_box = Gtk.Template.Child()
+    patch_wear_spin = Gtk.Template.Child()
 
     date_button = Gtk.Template.Child()
     calendar_popover = Gtk.Template.Child()
@@ -77,11 +79,15 @@ class AddRecordDialog(Adw.MessageDialog):
 
         if idx < len(self.current_allowed_methods):
             method = self.current_allowed_methods[idx]
-            self.site_dropdown.set_visible(method == "Transdermal")
+            self.site_dropdown.set_visible(method == "Transdermal Gel")
+            self.patch_wear_box.set_visible(method == "Transdermal Patch")
             
             route_pk = self.meds_pk_map.get(med_name, {}).get(method, {})
             
-            if method == "Transdermal":
+            if method == "Transdermal Patch":
+                self.patch_wear_spin.set_value(float(route_pk.get("wear_hours", 84.0)))
+            
+            if method == "Transdermal Gel":
                 if "half_life" in route_pk or not route_pk:
                     available_sites = self.transdermal_sites
                 else:
@@ -109,7 +115,7 @@ class AddRecordDialog(Adw.MessageDialog):
         method = self.current_allowed_methods[idx]
         route_pk = self.meds_pk_map.get(med_name, {}).get(method, {})
         
-        if method == "Transdermal":
+        if method == "Transdermal Gel":
             site_idx = self.site_dropdown.get_selected()
             if getattr(self, 'current_available_sites', None) and site_idx != Gtk.INVALID_LIST_POSITION and site_idx < len(self.current_available_sites):
                 site_name = self.current_available_sites[site_idx]
@@ -134,10 +140,12 @@ class AddRecordDialog(Adw.MessageDialog):
         actual_method = self.current_allowed_methods[self.method_dropdown.get_selected()]
         
         actual_site = None
-        if actual_method == "Transdermal":
+        if actual_method == "Transdermal Gel":
             site_idx = self.site_dropdown.get_selected()
             if site_idx != Gtk.INVALID_LIST_POSITION and site_idx < len(self.current_available_sites):
                 actual_site = self.current_available_sites[site_idx]
+        elif actual_method == "Transdermal Patch":
+            actual_site = str(self.patch_wear_spin.get_value())
 
         dose = self.dose_spin.get_value()
         unit = self.preset_units[self.unit_dropdown.get_selected()]

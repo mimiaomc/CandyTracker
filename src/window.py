@@ -21,7 +21,7 @@ __TRANSLATION_ANCHORS = [
     _("Estrogel"), _("Progynova"), _("Androcur"),
     _("Estradiol"), _("Cyproterone Acetate"),
     _("Estradiol Valerate"),
-    _("Oral"), _("Sublingual"), _("Transdermal"), _("Injection")
+    _("Oral"), _("Sublingual"), _("Transdermal Gel"), _("Transdermal Patch"), _("Injection")
 ]
 # ==============================================================================
 
@@ -56,7 +56,7 @@ class CandytrackerWindow(Adw.ApplicationWindow):
         self.my_active_meds = []
         self.meds_allowed_map = {}
 
-        self.preset_methods = ["Oral", "Sublingual", "Transdermal", "Injection"]
+        self.preset_methods = ["Oral", "Sublingual", "Transdermal Gel", "Transdermal Patch", "Injection"]
         self.preset_units = ["mg", "g", "ml", "patch", "drop"]
         self.preset_icons = ["💊", "🧴", "💉", "🧪", "🩹", "🍬", "📦"]
 
@@ -195,6 +195,31 @@ class CandytrackerWindow(Adw.ApplicationWindow):
             )
         """)
         cursor.execute("CREATE TABLE IF NOT EXISTS preferences (key TEXT PRIMARY KEY, value TEXT)")
+
+        # Migrate Transdermal to Transdermal Gel
+        cursor.execute("UPDATE records SET method = 'Transdermal Gel' WHERE method = 'Transdermal'")
+        cursor.execute("UPDATE medications SET default_method = 'Transdermal Gel' WHERE default_method = 'Transdermal'")
+        
+        cursor.execute("SELECT id, allowed_methods FROM medications")
+        for m_id, methods_str in cursor.fetchall():
+            if methods_str:
+                methods_list = [m.strip() for m in methods_str.split(",")]
+                updated = False
+                for i in range(len(methods_list)):
+                    if methods_list[i] == "Transdermal":
+                        methods_list[i] = "Transdermal Gel"
+                        updated = True
+                if updated:
+                    cursor.execute("UPDATE medications SET allowed_methods = ? WHERE id = ?", (", ".join(methods_list), m_id))
+        cursor.execute("SELECT id, pk_data FROM medications WHERE pk_data LIKE '%\"Transdermal\":%'")
+        for m_id, pk_data_str in cursor.fetchall():
+            try:
+                pk = json.loads(pk_data_str)
+                if "Transdermal" in pk:
+                    pk["Transdermal Gel"] = pk.pop("Transdermal")
+                    cursor.execute("UPDATE medications SET pk_data = ? WHERE id = ?", (json.dumps(pk), m_id))
+            except Exception:
+                pass
 
         # 写入三条预设配置
         cursor.execute("INSERT OR IGNORE INTO preferences (key, value) VALUES ('auto_jump_history', '0')")
@@ -417,7 +442,10 @@ class CandytrackerWindow(Adw.ApplicationWindow):
         action_row.set_subtitle(f"{display_time}  •  {display_method}")
         action_row.add_prefix(Gtk.Label(label=med_icon))
 
-        dose_label = Gtk.Label(label=f"{dose_mg} {unit}")
+        if method == "Patch Remove":
+            dose_label = Gtk.Label(label="—")
+        else:
+            dose_label = Gtk.Label(label=f"{dose_mg} {unit}")
         dose_label.add_css_class("dim-label")
         action_row.add_suffix(dose_label)
 
@@ -744,11 +772,92 @@ class CandytrackerWindow(Adw.ApplicationWindow):
             row = Gtk.ListBoxRow()
             row.set_child(plot)
             list_box.append(row)
+            
+            # Check for active patch for this substance
+            patch_conn = sqlite3.connect(self.db_path)
+            patch_cursor = patch_conn.cursor()
+            patch_cursor.execute("""
+                SELECT r.timestamp, r.site, m.pk_data, r.med_name, r.id
+                FROM records r
+                JOIN medications m ON r.med_name = m.name
+                WHERE m.substance = ? AND r.method = 'Transdermal Patch'
+                ORDER BY r.timestamp DESC LIMIT 1
+            """, (sub_name,))
+            last_patch = patch_cursor.fetchone()
+            if last_patch:
+                apply_time, site_str, pk_json, patch_med_name, patch_rec_id = last_patch
+                patch_cursor.execute("""
+                    SELECT 1 FROM records
+                    WHERE med_name = ? AND method = 'Patch Remove' AND timestamp > ?
+                """, (patch_med_name, apply_time))
+                has_remove = patch_cursor.fetchone()
+                
+                if not has_remove:
+                    try:
+                        apply_dt = datetime.strptime(apply_time, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+                        now_dt = datetime.now(timezone.utc)
+                        delta_hours = (now_dt - apply_dt).total_seconds() / 3600.0
+                        
+                        pk_data = json.loads(pk_json)
+                        route_pk = pk_data.get("Transdermal Patch", {})
+                        expected_wear = route_pk.get("wear_hours", 84.0)
+                        if site_str:
+                            try:
+                                expected_wear = float(site_str)
+                            except ValueError: pass
+                        
+                        if 0 < delta_hours < expected_wear:
+                            patch_row = Adw.ActionRow(title=_("Wearing: ") + patch_med_name, subtitle=f"{delta_hours:.1f}h / {expected_wear:.1f}h")
+                            patch_row.set_activatable(True)
+                            
+                            progress = Gtk.ProgressBar(fraction=min(delta_hours / expected_wear, 1.0))
+                            progress.set_valign(Gtk.Align.CENTER)
+                            progress.set_margin_start(12)
+                            
+                            box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+                            box.append(progress)
+                            patch_row.add_suffix(box)
+                            
+                            # Disconnect old handler to override activation behavior
+                            def on_patch_row_activated(r, p_med=patch_med_name):
+                                self.prompt_end_patch(p_med)
+                            patch_row.connect("activated", on_patch_row_activated)
+                            
+                            list_box.append(patch_row)
+                    except Exception as e:
+                        print(e)
+            patch_conn.close()
 
             group.add(header_box)
             group.add(list_box)
             self.dashboard_box.append(group)
             self.active_plots.append((plot, sub_name))
+
+    def prompt_end_patch(self, med_name):
+        dialog = Adw.MessageDialog(
+            transient_for=self,
+            heading=_("End Patch Wear?"),
+            body=_("是否提前结束当前贴片的佩戴？")
+        )
+        dialog.add_response("cancel", _("Cancel"))
+        dialog.add_response("end", _("End Wear"))
+        dialog.set_response_appearance("end", Adw.ResponseAppearance.DESTRUCTIVE)
+        
+        def on_response(d, response_id):
+            if response_id == "end":
+                now_utc = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+                conn = sqlite3.connect(self.db_path)
+                cursor = conn.cursor()
+                cursor.execute("INSERT INTO records (timestamp, med_name, method, dose_mg, unit) VALUES (?, ?, ?, ?, ?)",
+                               (now_utc, med_name, "Patch Remove", 0, "patch"))
+                conn.commit()
+                conn.close()
+                self.load_history()
+                self.load_dashboard()
+                self.toast_overlay.add_toast(Adw.Toast.new(_("Patch removed.")))
+                
+        dialog.connect("response", on_response)
+        dialog.present()
 
     def move_substance(self, substance, direction):
         conn = sqlite3.connect(self.db_path)

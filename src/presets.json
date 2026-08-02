@@ -2,18 +2,58 @@
   {
     "name": "Estrogel",
     "substance": "Estradiol",
-    "default_method": "Transdermal",
+    "default_method": "Transdermal Gel",
     "unit": "g",
     "icon": "🧴",
-    "allowed_methods": "Transdermal",
+    "allowed_methods": "Transdermal Gel",
     "pk_data": {
-      "Transdermal": {
-        "model": "1_comp",
-        "half_life": 36.0,
-        "bio": 6.0,
-        "peak": 16.0,
-        "default_dose": 1.25,
-        "unit": "g"
+      "Transdermal Gel": {
+        "Arm": {
+          "model": "1_comp",
+          "half_life": 36.0,
+          "bio": 6.0,
+          "peak": 16.0,
+          "default_dose": 1.25,
+          "unit": "g"
+        },
+        "Inner Thigh": {
+          "model": "1_comp",
+          "half_life": 36.0,
+          "bio": 6.0,
+          "peak": 16.0,
+          "default_dose": 1.25,
+          "unit": "g"
+        },
+        "Scrotal": {
+          "model": "1_comp",
+          "half_life": 36.0,
+          "bio": 25.0,
+          "peak": 8.0,
+          "default_dose": 1.25,
+          "unit": "g"
+        }
+      },
+      "global_target_min": 100.0,
+      "global_target_max": 200.0,
+      "global_target_unit": "pg/mL"
+    },
+    "track_mode": "half_life"
+  },
+  {
+    "name": "Estradiol Patch 50",
+    "substance": "Estradiol",
+    "default_method": "Transdermal Patch",
+    "unit": "patch",
+    "icon": "🩹",
+    "allowed_methods": "Transdermal Patch",
+    "pk_data": {
+      "Transdermal Patch": {
+        "model": "patch_zero_order",
+        "wear_hours": 84.0,
+        "release_rate": 50.0,
+        "patch_scale": 1.0,
+        "default_dose": 1.0,
+        "unit": "patch"
       },
       "global_target_min": 100.0,
       "global_target_max": 200.0,

@@ -108,9 +108,11 @@ class MedicationCreatorPage(Adw.NavigationPage):
         on_mode_changed()
 
         for m in self.preset_methods:
-            if m == "Transdermal":
+            if m == "Transdermal Gel":
                 self.pk_data_dict[m] = {site: {"half_life": 12.0, "bio": 5.0, "peak": 2.0, "default_dose": 2.0, "unit": "mg"} for site in self.transdermal_sites}
                 self.enabled_transdermal_sites = set(self.transdermal_sites)
+            elif m == "Transdermal Patch":
+                self.pk_data_dict[m] = {"model": "patch_zero_order", "wear_hours": 84.0, "release_rate": 50.0, "patch_scale": 1.0, "default_dose": 1.0, "unit": "patch"}
             else:
                 self.pk_data_dict[m] = {"half_life": 12.0, "bio": 5.0, "peak": 2.0, "default_dose": 2.0, "unit": "mg"}
 
@@ -155,12 +157,12 @@ class MedicationCreatorPage(Adw.NavigationPage):
                         continue
                     if isinstance(data, dict):
                         if m == "Transdermal":
-                            if "half_life" in data: # Legacy format
-                                self.pk_data_dict[m] = {site: data.copy() for site in self.transdermal_sites}
-                                self.enabled_transdermal_sites = set(self.transdermal_sites)
-                            else:
-                                self.pk_data_dict[m] = data
-                                self.enabled_transdermal_sites = set(data.keys())
+                            m = "Transdermal Gel" # Legacy format mapping to Gel
+                            self.pk_data_dict[m] = {site: data.copy() for site in self.transdermal_sites} if "half_life" in data else data
+                            self.enabled_transdermal_sites = set(self.pk_data_dict[m].keys())
+                        elif m == "Transdermal Gel":
+                            self.pk_data_dict[m] = data
+                            self.enabled_transdermal_sites = set(data.keys())
                         else:
                             if "default_dose" not in data: data["default_dose"] = 2.0
                             if "unit" not in data: data["unit"] = unit if unit else "mg"
@@ -178,8 +180,8 @@ class MedicationCreatorPage(Adw.NavigationPage):
 
     def on_route_activated(self, route_name):
         current_mode = "dosage" if self.track_mode_row.get_selected() == 1 else "half_life"
-        if route_name == "Transdermal":
-            page = TransdermalSitesPage(self.transdermal_sites, self.pk_data_dict["Transdermal"], self.preset_units, current_mode, self.nav_view, self.enabled_transdermal_sites)
+        if route_name == "Transdermal Gel":
+            page = TransdermalSitesPage(self.transdermal_sites, self.pk_data_dict["Transdermal Gel"], self.preset_units, current_mode, self.nav_view, self.enabled_transdermal_sites)
             self.nav_view.push(page)
         else:
             page = PkSetupPage(route_name, self.pk_data_dict[route_name], self.preset_units, current_mode)
@@ -203,17 +205,17 @@ class MedicationCreatorPage(Adw.NavigationPage):
 
         final_pk_data = {}
         for m in allowed:
-            if m == "Transdermal":
+            if m == "Transdermal Gel":
                 enabled_sites = {}
                 for site in self.enabled_transdermal_sites:
-                    if site not in self.pk_data_dict["Transdermal"]:
-                        self.pk_data_dict["Transdermal"][site] = {"half_life": 12.0, "bio": 5.0, "peak": 2.0, "default_dose": 2.0, "unit": "mg"}
-                    enabled_sites[site] = self.pk_data_dict["Transdermal"][site]
+                    if site not in self.pk_data_dict["Transdermal Gel"]:
+                        self.pk_data_dict["Transdermal Gel"][site] = {"half_life": 12.0, "bio": 5.0, "peak": 2.0, "default_dose": 2.0, "unit": "mg"}
+                    enabled_sites[site] = self.pk_data_dict["Transdermal Gel"][site]
                 
-                if not enabled_sites and self.transdermal_sites:
-                    fallback = self.transdermal_sites[0]
-                    enabled_sites[fallback] = self.pk_data_dict["Transdermal"].get(fallback, {"half_life": 12.0, "bio": 5.0, "peak": 2.0, "default_dose": 2.0, "unit": "mg"})
-                    
+                if not enabled_sites:
+                    fallback = self.transdermal_sites[0] if self.transdermal_sites else "Arm"
+                    enabled_sites[fallback] = self.pk_data_dict["Transdermal Gel"].get(fallback, {"half_life": 12.0, "bio": 5.0, "peak": 2.0, "default_dose": 2.0, "unit": "mg"})
+                
                 final_pk_data[m] = enabled_sites
             else:
                 final_pk_data[m] = self.pk_data_dict[m]
@@ -226,9 +228,9 @@ class MedicationCreatorPage(Adw.NavigationPage):
         global_fallback_unit = "mg"
         if allowed:
             first_method = allowed[0]
-            if first_method == "Transdermal":
-                if self.transdermal_sites and self.transdermal_sites[0] in final_pk_data["Transdermal"]:
-                    global_fallback_unit = final_pk_data["Transdermal"][self.transdermal_sites[0]].get("unit", "mg")
+            if first_method == "Transdermal Gel":
+                if self.transdermal_sites and self.transdermal_sites[0] in final_pk_data["Transdermal Gel"]:
+                    global_fallback_unit = final_pk_data["Transdermal Gel"][self.transdermal_sites[0]].get("unit", "mg")
             else:
                 global_fallback_unit = final_pk_data[first_method].get("unit", "mg")
 

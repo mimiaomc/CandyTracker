@@ -169,14 +169,22 @@ class ConcentrationPlot(Gtk.Box):
                 rec_ts = datetime.strptime(rec_time_str, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc).timestamp()
                 
                 route_pk = meds_pk.get(m_name, {}).get(method, {})
-                if method == "Transdermal" and "half_life" not in route_pk:
+                if method in ["Transdermal", "Transdermal Gel"] and "half_life" not in route_pk:
                     site_name = site if site else "Arm"
                     route_pk = route_pk.get(site_name, {})
+                
+                if method == "Transdermal Patch":
+                    try:
+                        route_pk["wear_hours"] = float(site)
+                    except (ValueError, TypeError):
+                        pass
 
                 parsed_records.append({
                     "ts": rec_ts,
                     "dose": dose,
-                    "pk": route_pk
+                    "pk": route_pk,
+                    "med": m_name,
+                    "method": method
                 })
                 # 只要存在未超出渲染末尾期限的数据，就说明图表里有东西画
                 if rec_ts <= end_sim:
@@ -187,7 +195,20 @@ class ConcentrationPlot(Gtk.Box):
 
         # 智能路由分拣
         euler_records = [r for r in parsed_records if r["pk"].get("model") == "3_compartment"]
-        bateman_records = [r for r in parsed_records if r["pk"].get("model") != "3_compartment"]
+        patch_records = [r for r in parsed_records if r["pk"].get("model") == "patch_zero_order"]
+        bateman_records = [r for r in parsed_records if r["pk"].get("model") not in ("3_compartment", "patch_zero_order") and r["method"] != "Patch Remove"]
+        patch_removes = [r for r in parsed_records if r["method"] == "Patch Remove"]
+
+        # 事件配对：计算真实贴片佩戴时长
+        for pr in patch_records:
+            pr_med = pr["med"]
+            pr_ts = pr["ts"]
+            expected = pr["pk"].get("wear_hours", 84.0)
+            for remove_rec in patch_removes:
+                if remove_rec["med"] == pr_med and remove_rec["ts"] > pr_ts:
+                    actual = (remove_rec["ts"] - pr_ts) / 3600.0
+                    pr["pk"]["wear_hours"] = min(expected, actual)
+                    break
 
         # 三室模型必须从有史以来第一针开始积分，以累计深外周室（脂肪）里的药量
         integration_start = start_sim
@@ -266,8 +287,32 @@ class ConcentrationPlot(Gtk.Box):
                     conc_contribution = amplitude * (math.exp(-ke * delta_hours) - math.exp(-ka * delta_hours))
                     bateman_conc += max(conc_contribution, 0.0)
 
-                # 将高阶代谢物与普通药物在同一时刻的浓度叠加
-                points.append((current_t, euler_conc + bateman_conc))
+            # 贴片零阶释放模型
+            patch_conc = 0.0
+            if current_t >= start_sim:
+                for rec in patch_records:
+                    if rec["ts"] > current_t: break
+
+                    delta_hours = (current_t - rec["ts"]) / 3600.0
+                    route_pk = rec["pk"]
+                    
+                    wear_hours = route_pk.get("wear_hours", 84.0)
+                    release_rate = route_pk.get("release_rate", 50.0) # µg/day
+                    patch_scale = route_pk.get("patch_scale", 1.0)
+                    
+                    k3 = 0.41 # default generic clearance
+                    rate_mg_h = (release_rate / 1000.0 / 24.0) * patch_scale * rec["dose"]
+                    
+                    if delta_hours <= wear_hours:
+                        amount = (rate_mg_h / k3) * (1 - math.exp(-k3 * delta_hours))
+                    else:
+                        amount_at_remove = (rate_mg_h / k3) * (1 - math.exp(-k3 * wear_hours))
+                        amount = amount_at_remove * math.exp(-k3 * (delta_hours - wear_hours))
+                        
+                    patch_conc += max(amount * dynamic_multiplier, 0.0)
+
+                # 将三种不同动力学模型的计算结果于当前时刻汇总叠加
+                points.append((current_t, euler_conc + bateman_conc + patch_conc))
 
             # 推进时间轴
             current_t += step_sec
