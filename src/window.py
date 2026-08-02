@@ -901,6 +901,11 @@ class CandytrackerWindow(Adw.ApplicationWindow):
                 conn.close()
                 self.load_history()
                 self.load_dashboard()
+                
+                visible_page = self.home_nav_view.get_visible_page()
+                if visible_page and hasattr(visible_page, 'refresh_dynamic_data'):
+                    visible_page.refresh_dynamic_data()
+                    
                 self.toast_overlay.add_toast(Adw.Toast.new(_("Patch state saved.")))
                 
         dialog.connect("response", on_response)
