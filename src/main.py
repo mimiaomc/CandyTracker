@@ -85,7 +85,7 @@ class CandytrackerApplication(Adw.Application):
             application_name=_('CandyTracker'),
             application_icon='com.github.mimiaomc.candytracker',
             developer_name='MM 喵了个',
-            version='0.9.8',
+            version='0.9.9',
             translator_credits=_('translator-credits'),
             developers=['MM 喵了个'],
             copyright='© 2026 MM 喵了个',
