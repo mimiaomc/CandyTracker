@@ -1,6 +1,6 @@
 [Desktop Entry]
-Name=CandyTracker
-Comment=A beautiful medication kinetics tracker
+_Name=CandyTracker
+_Comment=A medication kinetics tracker
 Exec=candytracker
 Icon=com.github.mimiaomc.candytracker
 StartupWMClass=com.github.mimiaomc.candytracker

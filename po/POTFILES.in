@@ -1,8 +1,21 @@
 # List of source files containing translatable strings.
 # Please keep this file sorted alphabetically.
 data/com.github.mimiaomc.candytracker.desktop.in
-data/com.github.mimiaomc.candytracker.metainfo.xml.in
 data/com.github.mimiaomc.candytracker.gschema.xml
+data/com.github.mimiaomc.candytracker.metainfo.xml.in
+src/add_record_dialog.py
+src/add_record_dialog.ui
+src/chart_details_page.py
+src/chart_details_page.ui
+src/concentration_plot.py
+src/concentration_plot.ui
 src/main.py
+src/medication_creator_page.py
+src/medication_creator_page.ui
+src/pk_setup_page.py
+src/pk_setup_page.ui
+src/preferences_window.py
+src/preferences_window.ui
+src/shortcuts-dialog.ui
 src/window.py
 src/window.ui

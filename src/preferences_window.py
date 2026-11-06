@@ -64,11 +64,11 @@ class PreferencesWindow(Adw.PreferencesWindow):
     def on_clear_records_clicked(self, button):
         dialog = Adw.MessageDialog(
             transient_for=self,
-            heading="Clear All Records?",
-            body="This will permanently delete all your intake history.\n\nYour active medication library will NOT be affected. This action CANNOT be undone."
+            heading=_("Clear All Records?"),
+            body=_("This will permanently delete all your intake history.\n\nYour active medication library will NOT be affected. This action CANNOT be undone.")
         )
-        dialog.add_response("cancel", "Cancel")
-        dialog.add_response("delete", "Delete All")
+        dialog.add_response("cancel", _("Cancel"))
+        dialog.add_response("delete", _("Delete All"))
         # 把删除按钮变成红色
         dialog.set_response_appearance("delete", Adw.ResponseAppearance.DESTRUCTIVE)
 
@@ -85,7 +85,7 @@ class PreferencesWindow(Adw.PreferencesWindow):
                 # 在这里顺手让主窗口的图表刷新重绘
                 self.main_window.load_dashboard()
 
-                self.main_window.toast_overlay.add_toast(Adw.Toast.new("All records have been cleared."))
+                self.main_window.toast_overlay.add_toast(Adw.Toast.new(_("All records have been cleared.")))
                 self.close()
 
         dialog.connect("response", handle_response)
