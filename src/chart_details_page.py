@@ -28,24 +28,6 @@ class ChartDetailsPage(Adw.NavigationPage):
         self.plot.set_size_request(-1, 240)
         self.chart_group.add(self.plot)
 
-        # 塞入下拉框数据 (历史计算的切片）
-        if status_msg:
-            lbl = Gtk.Label(label=status_msg)
-            lbl.add_css_class("dim-label")
-            self.data_expander.add_row(lbl)
-        else:
-            for dt_str, val_str in reversed(points_data):
-                row = Adw.ActionRow(title=dt_str)
-                lbl = Gtk.Label(label=val_str)
-                lbl.add_css_class("dim-label")
-                row.add_suffix(lbl)
-
-                row.set_activatable(True)
-                copy_text = f"[{dt_str}] Level: {val_str}"
-                row.connect("activated", lambda r, txt=copy_text: self.copy_to_clipboard(txt))
-
-                self.data_expander.add_row(row)
-
         # 初始化时立刻主动拉取并渲染一次数据
         self.refresh_dynamic_data()
 
@@ -63,9 +45,36 @@ class ChartDetailsPage(Adw.NavigationPage):
             clipboard.set_content(Gdk.ContentProvider.new_for_value(text))
         self.main_window.toast_overlay.add_toast(Adw.Toast.new(_("Copied to clipboard.")))
 
+    def _rebuild_data_rows(self, points_data, status_msg):
+        if hasattr(self, '_data_rows'):
+            for r in self._data_rows:
+                self.data_expander.remove(r)
+        self._data_rows = []
+
+        if status_msg:
+            lbl = Gtk.Label(label=status_msg)
+            lbl.add_css_class("dim-label")
+            self.data_expander.add_row(lbl)
+            self._data_rows.append(lbl)
+        else:
+            for dt_str, val_str in reversed(points_data):
+                row = Adw.ActionRow(title=dt_str)
+                lbl = Gtk.Label(label=val_str)
+                lbl.add_css_class("dim-label")
+                row.add_suffix(lbl)
+
+                row.set_activatable(True)
+                copy_text = f"[{dt_str}] Level: {val_str}"
+                row.connect("activated", lambda r, txt=copy_text: self.copy_to_clipboard(txt))
+
+                self.data_expander.add_row(row)
+                self._data_rows.append(row)
+
     def refresh_dynamic_data(self):
         # 让图表重新从 SQLite 抓取数据并刷新画布
         self.plot.update_data(self.db_path, self.substance_name)
+        points_data, status_msg = self.plot.get_raw_points_data()
+        self._rebuild_data_rows(points_data, status_msg)
 
         # 重新计算并刷新上方的“当前浓度”数值面板
         if self.plot.is_pd_mode:
@@ -84,7 +93,8 @@ class ChartDetailsPage(Adw.NavigationPage):
 
             self.current_level_label.set_label(f"{curr_val:.2f} {self.plot.target_unit}")
 
-        # 返回 True 告诉系统
+        # 返回 True 告诉系统继续保持定时器生效
+        return True
 
     def do_unroot(self):
         # 极其果断地杀掉后台心跳

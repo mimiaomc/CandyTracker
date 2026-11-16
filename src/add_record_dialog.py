@@ -25,9 +25,12 @@ class AddRecordDialog(Adw.MessageDialog):
     def __init__(self, active_meds, meds_allowed_map, meds_pk_map, preset_units, transdermal_sites, **kwargs):
         super().__init__(**kwargs)
 
+        # active_meds: list of (med_id, med_name)
         self.active_meds = active_meds
+        self.active_med_ids = [m[0] for m in active_meds]
+        self.active_med_names = [m[1] for m in active_meds]
         self.meds_allowed_map = meds_allowed_map
-        self.meds_pk_map = meds_pk_map # 接收全局 PK 映射字典
+        self.meds_pk_map = meds_pk_map # 接收全局 PK 映射字典 (keyed by med_id)
         self.preset_units = preset_units
         self.transdermal_sites = transdermal_sites
         self.current_allowed_methods = ["Oral"]
@@ -35,7 +38,7 @@ class AddRecordDialog(Adw.MessageDialog):
 
         self.site_dropdown.set_model(Gtk.StringList.new([_(s) for s in self.transdermal_sites]))
 
-        self.med_dropdown.set_model(Gtk.StringList.new(self.active_meds))
+        self.med_dropdown.set_model(Gtk.StringList.new(self.active_med_names))
         self.unit_dropdown.set_model(Gtk.StringList.new(self.preset_units))
 
         hours = [f"{i:02d}" for i in range(24)]
@@ -60,10 +63,10 @@ class AddRecordDialog(Adw.MessageDialog):
         self.on_med_changed(self.med_dropdown, None)
 
     def on_med_changed(self, dropdown, pspec):
-        if not self.active_meds: return
-        med_name = self.active_meds[dropdown.get_selected()]
+        if not self.active_med_ids: return
+        med_id = self.active_med_ids[dropdown.get_selected()]
 
-        allowed = self.meds_allowed_map.get(med_name, ["Oral"])
+        allowed = self.meds_allowed_map.get(med_id, ["Oral"])
         self.current_allowed_methods = allowed
         translated_methods = [_(m) for m in allowed]
         self.method_dropdown.set_model(Gtk.StringList.new(translated_methods))
@@ -71,8 +74,8 @@ class AddRecordDialog(Adw.MessageDialog):
         self.on_method_changed(self.method_dropdown, None) # 触发剂量的联动
 
     def on_method_changed(self, dropdown, pspec):
-        if not self.active_meds or not self.current_allowed_methods: return
-        med_name = self.active_meds[self.med_dropdown.get_selected()]
+        if not self.active_med_ids or not self.current_allowed_methods: return
+        med_id = self.active_med_ids[self.med_dropdown.get_selected()]
 
         idx = self.method_dropdown.get_selected()
         if idx == Gtk.INVALID_LIST_POSITION: idx = 0
@@ -82,7 +85,7 @@ class AddRecordDialog(Adw.MessageDialog):
             self.site_dropdown.set_visible(method == "Transdermal Gel")
             self.patch_wear_box.set_visible(method == "Transdermal Patch")
             
-            route_pk = self.meds_pk_map.get(med_name, {}).get(method, {})
+            route_pk = self.meds_pk_map.get(med_id, {}).get(method, {})
             
             if method == "Transdermal Patch":
                 self.patch_wear_spin.set_value(float(route_pk.get("wear_hours", 84.0)))
@@ -107,13 +110,13 @@ class AddRecordDialog(Adw.MessageDialog):
         self.update_dose_from_current_selection()
         
     def update_dose_from_current_selection(self):
-        if not self.active_meds or not self.current_allowed_methods: return
-        med_name = self.active_meds[self.med_dropdown.get_selected()]
+        if not self.active_med_ids or not self.current_allowed_methods: return
+        med_id = self.active_med_ids[self.med_dropdown.get_selected()]
         
         idx = self.method_dropdown.get_selected()
         if idx == Gtk.INVALID_LIST_POSITION: return
         method = self.current_allowed_methods[idx]
-        route_pk = self.meds_pk_map.get(med_name, {}).get(method, {})
+        route_pk = self.meds_pk_map.get(med_id, {}).get(method, {})
         
         if method == "Transdermal Gel":
             site_idx = self.site_dropdown.get_selected()
@@ -136,7 +139,9 @@ class AddRecordDialog(Adw.MessageDialog):
         self.calendar_popover.popdown()
 
     def get_record_data(self):
-        med_name = self.active_meds[self.med_dropdown.get_selected()]
+        sel_idx = self.med_dropdown.get_selected()
+        med_id = self.active_med_ids[sel_idx]
+        med_name = self.active_med_names[sel_idx]
         actual_method = self.current_allowed_methods[self.method_dropdown.get_selected()]
         
         actual_site = None
@@ -158,4 +163,4 @@ class AddRecordDialog(Adw.MessageDialog):
         utc_dt = local_dt.astimezone(timezone.utc)
         utc_str = utc_dt.strftime("%Y-%m-%d %H:%M:%S")
 
-        return med_name, actual_method, actual_site, dose, unit, utc_str
+        return med_id, med_name, actual_method, actual_site, dose, unit, utc_str

@@ -53,7 +53,7 @@ class CandytrackerWindow(Adw.ApplicationWindow):
 
         data_dir = GLib.get_user_data_dir()
         os.makedirs(data_dir, exist_ok=True)
-        self.db_path = os.path.join(data_dir, "candytracker_v4.db")
+        self.db_path = os.path.join(data_dir, "candytracker_v5.db")
 
         self.my_active_meds = []
         self.meds_allowed_map = {}
@@ -186,45 +186,36 @@ class CandytrackerWindow(Adw.ApplicationWindow):
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
-        cursor.execute("CREATE TABLE IF NOT EXISTS records (id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT NOT NULL, med_name TEXT, substance TEXT DEFAULT 'Unknown', dose_mg REAL, unit TEXT, method TEXT)")
-        try:
-            cursor.execute("ALTER TABLE records ADD COLUMN site TEXT DEFAULT NULL")
-        except sqlite3.OperationalError:
-            pass
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS records (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT NOT NULL,
+                med_id TEXT NOT NULL,
+                med_name TEXT,
+                substance TEXT DEFAULT 'Unknown',
+                dose_mg REAL,
+                unit TEXT,
+                method TEXT,
+                site TEXT DEFAULT NULL
+            )
+        """)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS medications (
-                id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, substance TEXT DEFAULT 'Unknown', default_method TEXT,
-                unit TEXT, icon TEXT, allowed_methods TEXT, pk_data TEXT, track_mode TEXT DEFAULT 'half_life', sort_order INTEGER DEFAULT 0
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                substance TEXT DEFAULT 'Unknown',
+                default_method TEXT,
+                unit TEXT,
+                icon TEXT,
+                allowed_methods TEXT,
+                pk_data TEXT,
+                track_mode TEXT DEFAULT 'half_life',
+                sort_order INTEGER DEFAULT 0
             )
         """)
         cursor.execute("CREATE TABLE IF NOT EXISTS preferences (key TEXT PRIMARY KEY, value TEXT)")
 
-        # Migrate Transdermal to Transdermal Gel
-        cursor.execute("UPDATE records SET method = 'Transdermal Gel' WHERE method = 'Transdermal'")
-        cursor.execute("UPDATE medications SET default_method = 'Transdermal Gel' WHERE default_method = 'Transdermal'")
-        
-        cursor.execute("SELECT id, allowed_methods FROM medications")
-        for m_id, methods_str in cursor.fetchall():
-            if methods_str:
-                methods_list = [m.strip() for m in methods_str.split(",")]
-                updated = False
-                for i in range(len(methods_list)):
-                    if methods_list[i] == "Transdermal":
-                        methods_list[i] = "Transdermal Gel"
-                        updated = True
-                if updated:
-                    cursor.execute("UPDATE medications SET allowed_methods = ? WHERE id = ?", (", ".join(methods_list), m_id))
-        cursor.execute("SELECT id, pk_data FROM medications WHERE pk_data LIKE '%\"Transdermal\":%'")
-        for m_id, pk_data_str in cursor.fetchall():
-            try:
-                pk = json.loads(pk_data_str)
-                if "Transdermal" in pk:
-                    pk["Transdermal Gel"] = pk.pop("Transdermal")
-                    cursor.execute("UPDATE medications SET pk_data = ? WHERE id = ?", (json.dumps(pk), m_id))
-            except Exception:
-                pass
-
-        # 写入三条预设配置
+        # 写入预设配置
         cursor.execute("INSERT OR IGNORE INTO preferences (key, value) VALUES ('auto_jump_history', '0')")
         cursor.execute("INSERT OR IGNORE INTO preferences (key, value) VALUES ('eula_agreed', '0')")
         cursor.execute("INSERT OR IGNORE INTO preferences (key, value) VALUES ('user_weight', '')")
@@ -243,21 +234,20 @@ class CandytrackerWindow(Adw.ApplicationWindow):
         rows = cursor.fetchall()
         conn.close()
 
-        self.my_active_meds = [row[1] for row in rows]
+        self.my_active_meds = [(row[0], row[1]) for row in rows]
         self.meds_allowed_map = {}
         self.meds_pk_map = {}
 
         for row in rows:
-            # raw_methods 现在是 row[6]
+            med_id = row[0]
             raw_methods = row[6] if row[6] else row[3]
-            self.meds_allowed_map[row[1]] = [m.strip() for m in raw_methods.split(",")]
+            self.meds_allowed_map[med_id] = [m.strip() for m in raw_methods.split(",")]
 
-            # pk_json 现在是 row[7]
             pk_json = row[7] if row[7] else "{}"
             try:
-                self.meds_pk_map[row[1]] = json.loads(pk_json)
+                self.meds_pk_map[med_id] = json.loads(pk_json)
             except json.JSONDecodeError:
-                self.meds_pk_map[row[1]] = {}
+                self.meds_pk_map[med_id] = {}
 
         if not rows:
             self.meds_empty_clamp.set_visible(True)
@@ -269,11 +259,12 @@ class CandytrackerWindow(Adw.ApplicationWindow):
         self.meds_scrolled.set_visible(True)
 
         for row in rows:
+            med_id = row[0]
             action_row = Adw.ActionRow()
             action_row.set_title(row[1])
 
             # “方法 | 单位 | 物质”
-            all_methods = self.meds_allowed_map.get(row[1], [row[3]])
+            all_methods = self.meds_allowed_map.get(med_id, [row[3]])
             display_methods = " / ".join([_(m) for m in all_methods])
 
             # 给物质名称也套上翻译，这样以后可以支持多语言物质名
@@ -290,11 +281,11 @@ class CandytrackerWindow(Adw.ApplicationWindow):
             btn_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0, valign=Gtk.Align.CENTER)
             up_btn = Gtk.Button(icon_name="go-up-symbolic")
             up_btn.add_css_class("flat")
-            up_btn.connect("clicked", lambda b, mid=row[0]: self.move_med(mid, -1))
+            up_btn.connect("clicked", lambda b, mid=med_id: self.move_med(mid, -1))
 
             down_btn = Gtk.Button(icon_name="go-down-symbolic")
             down_btn.add_css_class("flat")
-            down_btn.connect("clicked", lambda b, mid=row[0]: self.move_med(mid, 1))
+            down_btn.connect("clicked", lambda b, mid=med_id: self.move_med(mid, 1))
 
             btn_box.append(up_btn)
             btn_box.append(down_btn)
@@ -343,14 +334,15 @@ class CandytrackerWindow(Adw.ApplicationWindow):
 
             # 列表结构
             modified_payload = [
-                translated_name,            # 0: name (固化为中文)
-                translated_substance,       # 1: substance (固化为中文，消除图表悬浮不更新的 bug)
-                item["default_method"],     # 2: default_method
-                item["unit"],               # 3: unit
-                item["icon"],               # 4: icon
-                raw_allowed,                # 5: allowed_methods
-                json.dumps(item["pk_data"]),# 6: pk_data_json (依然需要转成字符串传给下一页)
-                item["track_mode"]          # 7: track_mode
+                item.get("id", ""),         # 0: med_id (唯一标识符)
+                translated_name,            # 1: name
+                translated_substance,       # 2: substance
+                item["default_method"],     # 3: default_method
+                item["unit"],               # 4: unit
+                item["icon"],               # 5: icon
+                raw_allowed,                # 6: allowed_methods
+                json.dumps(item["pk_data"]),# 7: pk_data_json
+                item["track_mode"]          # 8: track_mode
             ]
 
             shop_row.set_activatable(True)
@@ -363,17 +355,10 @@ class CandytrackerWindow(Adw.ApplicationWindow):
             if success:
                 self.sync_weight_from_db()
                 self.load_medications()
+                self.load_history()
                 self.load_dashboard()
                 self.meds_nav_view.pop()
-
-                if msg == "Deleted":
-                    self.load_history()
-                    self.toast_overlay.add_toast(Adw.Toast.new(_("'{med_name}' removed.").format(med_name=med_name)))
-                elif msg == "HistoryCleared":
-                    self.load_history()
-                    self.toast_overlay.add_toast(Adw.Toast.new(_("History for '{med_name}' cleared.").format(med_name=med_name)))
-                else:
-                    self.toast_overlay.add_toast(Adw.Toast.new(_("Medication '{med_name}' updated!").format(med_name=med_name)))
+                self.toast_overlay.add_toast(Adw.Toast.new(_("Medication '{med_name}' crafted successfully!").format(med_name=med_name)))
             else:
                 self.toast_overlay.add_toast(Adw.Toast.new(msg))
 
@@ -410,6 +395,7 @@ class CandytrackerWindow(Adw.ApplicationWindow):
                     if success:
                         self.sync_weight_from_db()
                         self.load_medications()
+                        self.load_history()
                         self.meds_nav_view.pop()
                         self.toast_overlay.add_toast(Adw.Toast.new(_("Medication '{med_name}' crafted successfully!").format(med_name=med_name)))
                     else:
@@ -471,14 +457,10 @@ class CandytrackerWindow(Adw.ApplicationWindow):
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
-        # 多级 SQL 排序
-        # COALESCE(m.sort_order, 9999) ASC: 优先按 Medications 里的自定义排序显示。
-        #    (如果这个药被你删除了变成了“历史存档”，它就没有 sort_order 了，COALESCE 会极其聪明地把它当成 9999 扔到列表最底部的吃灰区！)
-        # datetime(r.timestamp) DESC: 在同一种药的抽屉里，按时间倒序排列。
         cursor.execute("""
-            SELECT r.id, r.timestamp, r.med_name, r.dose_mg, r.unit, m.icon, r.method
+            SELECT r.id, r.timestamp, COALESCE(m.name, r.med_name), r.dose_mg, r.unit, m.icon, r.method, r.med_id
             FROM records r
-            LEFT JOIN medications m ON r.med_name = m.name
+            LEFT JOIN medications m ON r.med_id = m.id
             ORDER BY COALESCE(m.sort_order, 9999) ASC, datetime(r.timestamp) DESC, r.id DESC
         """)
         all_rows = cursor.fetchall()
@@ -492,33 +474,28 @@ class CandytrackerWindow(Adw.ApplicationWindow):
         self.history_empty_clamp.set_visible(False)
         self.history_scrolled.set_visible(True)
 
-        # 因为 Python 字典会极其忠实地保留插入顺序，而 SQL 已经帮我们把药物按 sort_order 聚拢在一起了，
-        # 所以这里自然而然就生成了排序完美的字典！
         grouped_records = {}
         for row in all_rows:
-            m_name = row[2]
-            if m_name not in grouped_records:
-                grouped_records[m_name] = []
-            grouped_records[m_name].append(row)
+            m_id = row[7]
+            if m_id not in grouped_records:
+                grouped_records[m_id] = []
+            grouped_records[m_id].append(row)
 
         # 为每一种药创建一个“专属抽屉”
-        for med_name, rows in grouped_records.items():
-            # 提取这种药物的图标
+        for med_id, rows in grouped_records.items():
+            med_name = rows[0][2] if rows[0][2] else med_id
             icon = rows[0][5] if rows[0][5] else "💊"
 
-            # 极其原生的折叠菜单 (ExpanderRow)
             expander = Adw.ExpanderRow(title=med_name)
             expander.set_subtitle(_("Total {count} records").format(count=len(rows)))
             expander.add_prefix(Gtk.Label(label=icon))
 
-            # 抽屉里最多只渲染最近 10 条
             display_rows = rows[:10]
 
             for row in display_rows:
                 action_row = self.create_action_row_from_db(row)
                 expander.add_row(action_row)
 
-            # 追加一个“查看全部”的专属弹窗入口
             if len(rows) > 10:
                 view_more_row = Adw.ActionRow(title=_("View all {count} records...").format(count=len(rows)))
                 view_more_row.set_activatable(True)
@@ -590,7 +567,7 @@ class CandytrackerWindow(Adw.ApplicationWindow):
 
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        cursor.execute("SELECT r.id, r.timestamp, r.med_name, r.dose_mg, r.unit, m.icon, r.method FROM records r LEFT JOIN medications m ON r.med_name = m.name ORDER BY datetime(r.timestamp) DESC, r.id DESC")
+        cursor.execute("SELECT r.id, r.timestamp, COALESCE(m.name, r.med_name), r.dose_mg, r.unit, m.icon, r.method FROM records r LEFT JOIN medications m ON r.med_id = m.id ORDER BY datetime(r.timestamp) DESC, r.id DESC")
         rows = cursor.fetchall()
         conn.close()
 
@@ -607,18 +584,20 @@ class CandytrackerWindow(Adw.ApplicationWindow):
 
     def open_med_editor(self, row_data):
         med_id = row_data[0]
-        # 对齐 prefill_data 格式: [name, substance, default_method, unit, icon, allowed_str, pk_json, track_mode]
-        payload = [row_data[1], row_data[2], row_data[3], row_data[4], row_data[5], row_data[6], row_data[7], row_data[8]]
+        # 对齐 prefill_data 格式: [med_id, name, substance, default_method, unit, icon, allowed_str, pk_json, track_mode]
+        payload = list(row_data)
 
         def on_crafted(med_name, success, msg):
             if success:
                 self.sync_weight_from_db()
                 self.load_medications()
+                self.load_history()
                 self.load_dashboard()
                 self.meds_nav_view.pop()
                 if msg == "Deleted":
-                    self.load_history()
                     self.toast_overlay.add_toast(Adw.Toast.new(_("'{med_name}' removed.").format(med_name=med_name)))
+                elif msg == "HistoryCleared":
+                    self.toast_overlay.add_toast(Adw.Toast.new(_("History for '{med_name}' cleared.").format(med_name=med_name)))
                 else:
                     self.toast_overlay.add_toast(Adw.Toast.new(_("Medication '{med_name}' updated!").format(med_name=med_name)))
             else:
@@ -669,18 +648,18 @@ class CandytrackerWindow(Adw.ApplicationWindow):
 
         def on_response(dialog_window, response_id):
             if response_id == "save":
-                med_name, actual_method, actual_site, dose, unit, utc_str = dialog_window.get_record_data()
+                med_id, med_name, actual_method, actual_site, dose, unit, utc_str = dialog_window.get_record_data()
 
                 conn = sqlite3.connect(self.db_path)
                 cursor = conn.cursor()
 
-                cursor.execute("SELECT substance FROM medications WHERE name = ?", (med_name,))
+                cursor.execute("SELECT substance FROM medications WHERE id = ?", (med_id,))
                 sub_row = cursor.fetchone()
                 substance = sub_row[0] if sub_row else "Unknown"
 
                 cursor.execute(
-                    "INSERT INTO records (timestamp, med_name, substance, dose_mg, unit, method, site) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                    (utc_str, med_name, substance, dose, unit, actual_method, actual_site)
+                    "INSERT INTO records (timestamp, med_id, med_name, substance, dose_mg, unit, method, site) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                    (utc_str, med_id, med_name, substance, dose, unit, actual_method, actual_site)
                 )
                 conn.commit()
                 conn.close()
@@ -781,9 +760,9 @@ class CandytrackerWindow(Adw.ApplicationWindow):
             patch_conn = sqlite3.connect(self.db_path)
             patch_cursor = patch_conn.cursor()
             patch_cursor.execute("""
-                SELECT r.timestamp, r.site, m.pk_data, r.med_name, r.id
+                SELECT r.timestamp, r.site, m.pk_data, m.name, r.id
                 FROM records r
-                JOIN medications m ON r.med_name = m.name
+                JOIN medications m ON r.med_id = m.id
                 WHERE m.substance = ? AND r.method = 'Transdermal Patch'
                 ORDER BY r.timestamp DESC LIMIT 1
             """, (sub_name,))
@@ -948,13 +927,9 @@ class CandytrackerWindow(Adw.ApplicationWindow):
                 if not row.get_parent(): continue
                 a_dt = datetime.strptime(a_time, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
                 dh = (now_dt - a_dt).total_seconds() / 3600.0
-                if dh >= exp:
-                    row.set_subtitle(f"{exp:.1f}h / {exp:.1f}h")
-                    prog.set_fraction(1.0)
-                else:
-                    row.set_subtitle(f"{dh:.1f}h / {exp:.1f}h")
-                    prog.set_fraction(dh / exp)
-                    alive_widgets.append((row, prog, a_time, exp))
+                row.set_subtitle(f"{dh:.1f}h / {exp:.1f}h")
+                prog.set_fraction(min(max(dh / max(exp, 0.1), 0.0), 1.0))
+                alive_widgets.append((row, prog, a_time, exp))
             self.active_patch_widgets = alive_widgets
             
         return True

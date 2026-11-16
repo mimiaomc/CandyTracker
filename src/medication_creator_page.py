@@ -1,3 +1,4 @@
+import re
 import sqlite3
 import json
 import gi
@@ -54,6 +55,7 @@ class MedicationCreatorPage(Adw.NavigationPage):
     delete_button = Gtk.Template.Child()
 
     craft_button = Gtk.Template.Child()
+    creator_id_row = Gtk.Template.Child()
     creator_name_row = Gtk.Template.Child()
     creator_icon_row = Gtk.Template.Child()
     track_mode_row = Gtk.Template.Child()
@@ -128,7 +130,8 @@ class MedicationCreatorPage(Adw.NavigationPage):
             row.connect("activated", lambda r, route=m: self.on_route_activated(route))
 
         if self.prefill_data:
-            name, substance, default_method, unit, icon, allowed_str, pk_json, track_mode = self.prefill_data
+            med_id, name, substance, default_method, unit, icon, allowed_str, pk_json, track_mode = self.prefill_data
+            self.creator_id_row.set_text(med_id if med_id else "")
             self.creator_name_row.set_text(name)
             self.creator_substance_row.set_text(substance if substance else "")
             for i, ic in enumerate(self.preset_icons):
@@ -156,11 +159,7 @@ class MedicationCreatorPage(Adw.NavigationPage):
                     if m in ["global_target_min", "global_target_max", "global_target_unit"]:
                         continue
                     if isinstance(data, dict):
-                        if m == "Transdermal":
-                            m = "Transdermal Gel" # Legacy format mapping to Gel
-                            self.pk_data_dict[m] = {site: data.copy() for site in self.transdermal_sites} if "half_life" in data else data
-                            self.enabled_transdermal_sites = set(self.pk_data_dict[m].keys())
-                        elif m == "Transdermal Gel":
+                        if m == "Transdermal Gel":
                             self.pk_data_dict[m] = data
                             self.enabled_transdermal_sites = set(data.keys())
                         else:
@@ -188,7 +187,14 @@ class MedicationCreatorPage(Adw.NavigationPage):
             self.nav_view.push(page)
 
     def on_craft_clicked(self, button):
+        med_id = self.creator_id_row.get_text().strip()
         name = self.creator_name_row.get_text().strip()
+        if not med_id:
+            self.on_success_cb(name, False, _("Please fill out the unique identifier!"))
+            return
+        if not re.match(r"^[a-z0-9_]+$", med_id):
+            self.on_success_cb(name, False, _("Identifier can only contain lowercase letters, numbers, and underscores!"))
+            return
         if not name:
             self.on_success_cb(name, False, _("Please fill out the medication name!"))
             return
@@ -244,13 +250,13 @@ class MedicationCreatorPage(Adw.NavigationPage):
 
             # 如果查不到，或者是个空字符串
             if not w_row or not w_row[0]:
-                self.prompt_weight_and_save(name, substance, allowed, icon, allowed_str, final_pk_data, track_mode, global_fallback_unit)
+                self.prompt_weight_and_save(med_id, name, substance, allowed, icon, allowed_str, final_pk_data, track_mode, global_fallback_unit)
                 return
 
         # PD模式，或者已经有体重了，直接保存
-        self._execute_db_save(name, substance, allowed, icon, allowed_str, final_pk_data, track_mode, global_fallback_unit)
+        self._execute_db_save(med_id, name, substance, allowed, icon, allowed_str, final_pk_data, track_mode, global_fallback_unit)
 
-    def prompt_weight_and_save(self, name, substance, allowed, icon, allowed_str, final_pk_data, track_mode, global_fallback_unit):
+    def prompt_weight_and_save(self, med_id, name, substance, allowed, icon, allowed_str, final_pk_data, track_mode, global_fallback_unit):
         dialog = Adw.MessageDialog(
             transient_for=self.get_root(),
             heading=_("Personal Data Required"),
@@ -276,36 +282,44 @@ class MedicationCreatorPage(Adw.NavigationPage):
                 conn.execute("UPDATE preferences SET value = ? WHERE key = 'user_weight'", (str(weight),))
                 conn.commit()
                 conn.close()
-                self._execute_db_save(name, substance, allowed, icon, allowed_str, final_pk_data, track_mode, global_fallback_unit)
+                self._execute_db_save(med_id, name, substance, allowed, icon, allowed_str, final_pk_data, track_mode, global_fallback_unit)
 
         dialog.connect("response", on_response)
         dialog.present()
 
-    def _execute_db_save(self, name, substance, allowed, icon, allowed_str, final_pk_data, track_mode, global_fallback_unit):
+    def _execute_db_save(self, med_id, name, substance, allowed, icon, allowed_str, final_pk_data, track_mode, global_fallback_unit):
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         try:
             if self.edit_med_id:
-                # 编辑模式：UPDATE 数据
+                # 编辑模式：UPDATE 数据并同步关联记录
                 cursor.execute(
-                    "UPDATE medications SET name=?, substance=?, default_method=?, unit=?, icon=?, allowed_methods=?, pk_data=?, track_mode=? WHERE id=?",
-                    (name, substance, allowed[0], global_fallback_unit, icon, allowed_str, json.dumps(final_pk_data), track_mode, self.edit_med_id)
+                    "UPDATE medications SET id=?, name=?, substance=?, default_method=?, unit=?, icon=?, allowed_methods=?, pk_data=?, track_mode=? WHERE id=?",
+                    (med_id, name, substance, allowed[0], global_fallback_unit, icon, allowed_str, json.dumps(final_pk_data), track_mode, self.edit_med_id)
+                )
+                cursor.execute(
+                    "UPDATE records SET med_id=?, med_name=?, substance=? WHERE med_id=?",
+                    (med_id, name, substance, self.edit_med_id)
                 )
             else:
-                # 创建模式：INSERT 数据
+                # 创建模式：INSERT 数据，如果存在同 ID 的归档历史记录也自动认领更新名称与成分
                 cursor.execute(
-                    "INSERT INTO medications (name, substance, default_method, unit, icon, allowed_methods, pk_data, track_mode) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                    (name, substance, allowed[0], global_fallback_unit, icon, allowed_str, json.dumps(final_pk_data), track_mode)
+                    "INSERT INTO medications (id, name, substance, default_method, unit, icon, allowed_methods, pk_data, track_mode) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (med_id, name, substance, allowed[0], global_fallback_unit, icon, allowed_str, json.dumps(final_pk_data), track_mode)
+                )
+                cursor.execute(
+                    "UPDATE records SET med_name=?, substance=? WHERE med_id=?",
+                    (name, substance, med_id)
                 )
             conn.commit()
             self.on_success_cb(name, True, _("Success"))
         except sqlite3.IntegrityError:
-            self.on_success_cb(name, False, _("This name already exists inside your active box."))
+            self.on_success_cb(name, False, _("This identifier already exists inside your active box."))
         finally:
             conn.close()
 
     def on_delete_clicked(self, button):
-        name = self.creator_name_row.get_text().strip()
+        name = self.creator_name_row.get_text().strip() or self.edit_med_id
         confirm_dialog = Adw.MessageDialog(
             transient_for=self.get_root(),
             heading=_("Remove '{med_name}'?").format(med_name=name),
@@ -324,7 +338,7 @@ class MedicationCreatorPage(Adw.NavigationPage):
             cursor = conn.cursor()
 
             if response_id == "delete_all":
-                cursor.execute("DELETE FROM records WHERE med_name = ?", (name,))
+                cursor.execute("DELETE FROM records WHERE med_id = ?", (self.edit_med_id,))
 
             cursor.execute("DELETE FROM medications WHERE id = ?", (self.edit_med_id,))
             conn.commit()
@@ -337,7 +351,7 @@ class MedicationCreatorPage(Adw.NavigationPage):
         confirm_dialog.present()
 
     def on_clear_history_clicked(self, button):
-        name = self.creator_name_row.get_text().strip()
+        name = self.creator_name_row.get_text().strip() or self.edit_med_id
         dialog = Adw.MessageDialog(
             transient_for=self.get_root(),
             heading=_("Clear all records for '{med_name}'?").format(med_name=name),
@@ -350,7 +364,7 @@ class MedicationCreatorPage(Adw.NavigationPage):
         def on_response(d, response_id):
             if response_id == "clear":
                 conn = sqlite3.connect(self.db_path)
-                conn.execute("DELETE FROM records WHERE med_name = ?", (name,))
+                conn.execute("DELETE FROM records WHERE med_id = ?", (self.edit_med_id,))
                 conn.commit()
                 conn.close()
                 # 借用回调函数通知主窗口

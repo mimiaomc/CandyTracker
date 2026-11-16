@@ -1,5 +1,6 @@
 [
   {
+    "id": "estrogel",
     "name": "Estrogel",
     "substance": "Estradiol",
     "default_method": "Transdermal Gel",
@@ -40,6 +41,7 @@
     "track_mode": "half_life"
   },
   {
+    "id": "estradiol_patch",
     "name": "Estradiol Patch",
     "substance": "Estradiol",
     "default_method": "Transdermal Patch",
@@ -62,6 +64,7 @@
     "track_mode": "half_life"
   },
   {
+    "id": "progynova",
     "name": "Progynova",
     "substance": "Estradiol",
     "default_method": "Oral",
@@ -92,6 +95,7 @@
     "track_mode": "half_life"
   },
   {
+    "id": "androcur",
     "name": "Androcur",
     "substance": "Cyproterone Acetate",
     "default_method": "Oral",
@@ -111,6 +115,7 @@
     "track_mode": "dosage"
   },
   {
+    "id": "estradiol_valerate",
     "name": "Estradiol Valerate",
     "substance": "Estradiol",
     "default_method": "Injection",

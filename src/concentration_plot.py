@@ -114,7 +114,7 @@ class ConcentrationPlot(Gtk.Box):
         self.pd_box.set_visible(False)
         self.set_size_request(-1, 180)
 
-        cursor.execute("SELECT name, pk_data FROM medications WHERE substance = ?", (target_substance,))
+        cursor.execute("SELECT id, pk_data FROM medications WHERE substance = ?", (target_substance,))
         meds_pk = {}
         for r in cursor.fetchall():
             try:
@@ -131,18 +131,11 @@ class ConcentrationPlot(Gtk.Box):
         # 120 天绝对足够让三室模型的脂肪储库完美达到稳态
         burn_in_limit = (now - timedelta(days=120)).strftime("%Y-%m-%d %H:%M:%S")
 
-        try:
-            cursor.execute(
-                "SELECT timestamp, med_name, dose_mg, method, site FROM records "
-                "WHERE substance = ? AND timestamp >= ? ORDER BY timestamp ASC",
-                (target_substance, burn_in_limit)
-            )
-        except sqlite3.OperationalError:
-            cursor.execute(
-                "SELECT timestamp, med_name, dose_mg, method, NULL as site FROM records "
-                "WHERE substance = ? AND timestamp >= ? ORDER BY timestamp ASC",
-                (target_substance, burn_in_limit)
-            )
+        cursor.execute(
+            "SELECT timestamp, med_id, dose_mg, method, site FROM records "
+            "WHERE substance = ? AND timestamp >= ? ORDER BY timestamp ASC",
+            (target_substance, burn_in_limit)
+        )
         records = cursor.fetchall()
         conn.close()
 
@@ -164,15 +157,18 @@ class ConcentrationPlot(Gtk.Box):
     def _calc_mixed_models(self, records, meds_pk, user_weight, start_sim, end_sim):
         parsed_records = []
         has_valid_records = False
-        for rec_time_str, m_name, dose, method, site in records:
+        for rec_time_str, m_id, dose, method, site in records:
             try:
                 rec_ts = datetime.strptime(rec_time_str, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc).timestamp()
                 
-                route_pk = meds_pk.get(m_name, {}).get(method, {})
-                if method in ["Transdermal", "Transdermal Gel"] and "half_life" not in route_pk:
+                route_pk = meds_pk.get(m_id, {}).get(method, {})
+                if method == "Transdermal Gel" and "half_life" not in route_pk:
                     site_name = site if site else "Arm"
                     route_pk = route_pk.get(site_name, {})
                 
+                # 拷贝字典，防止后续修改污染 meds_pk 里的共享引用
+                route_pk = dict(route_pk) if isinstance(route_pk, dict) else {}
+
                 if method == "Transdermal Patch":
                     if site:
                         if site.startswith("ended:") or site.startswith("active:"):
@@ -186,7 +182,7 @@ class ConcentrationPlot(Gtk.Box):
                     "ts": rec_ts,
                     "dose": dose,
                     "pk": route_pk,
-                    "med": m_name,
+                    "med": m_id,
                     "method": method
                 })
                 # 只要存在未超出渲染末尾期限的数据，就说明图表里有东西画
@@ -213,10 +209,8 @@ class ConcentrationPlot(Gtk.Box):
         points = []
         dynamic_multiplier = 1000000.0 / (user_weight * 19.0)
 
-        # 初始三室水池
-        depot_mg = 0.0
-        central_mg = 0.0
-        fat_mg = 0.0
+        # 初始三室水池（按药物/配置独立维护水池，避免不同针剂酯类混用时参数互相覆盖）
+        euler_pools = {}
         record_idx = 0
 
         while current_t <= end_sim:
@@ -226,15 +220,23 @@ class ConcentrationPlot(Gtk.Box):
                 rec = parsed_records[record_idx]
                 if current_t >= rec["ts"]:
                     if rec["pk"].get("model") == "3_compartment":
-                        depot_mg += rec["dose"]
+                        med_key = rec["med"]
+                        if med_key not in euler_pools:
+                            euler_pools[med_key] = {
+                                "depot_mg": 0.0,
+                                "central_mg": 0.0,
+                                "fat_mg": 0.0,
+                                "pk": rec["pk"]
+                            }
+                        euler_pools[med_key]["depot_mg"] += rec["dose"]
+                        euler_pools[med_key]["pk"] = rec["pk"]
                     record_idx += 1
                 else:
                     break
 
             euler_conc = 0.0
-            if euler_records:
-                # 提取配置参数 (默认从找到的第一个高阶配置里提取)
-                pk_info = euler_records[0]["pk"]
+            for pool in euler_pools.values():
+                pk_info = pool["pk"]
                 k_absorb = pk_info.get("k_absorb", 0.02)
                 k_elim = pk_info.get("k_elim", 0.15)
                 k_cf = pk_info.get("k_cf", 0.08)
@@ -242,18 +244,18 @@ class ConcentrationPlot(Gtk.Box):
                 vd = pk_info.get("vd", 19.0) # 默认值设为 19.0 L/kg
 
                 # 计算流量
-                absorbed = depot_mg * k_absorb * dt_hours
-                eliminated = central_mg * k_elim * dt_hours
-                to_fat = central_mg * k_cf * dt_hours
-                from_fat = fat_mg * k_fc * dt_hours
+                absorbed = pool["depot_mg"] * k_absorb * dt_hours
+                eliminated = pool["central_mg"] * k_elim * dt_hours
+                to_fat = pool["central_mg"] * k_cf * dt_hours
+                from_fat = pool["fat_mg"] * k_fc * dt_hours
 
                 # 刷新水池
-                depot_mg = max(0.0, depot_mg - absorbed)
-                fat_mg = max(0.0, fat_mg + to_fat - from_fat)
-                central_mg = max(0.0, central_mg + absorbed + from_fat - eliminated - to_fat)
+                pool["depot_mg"] = max(0.0, pool["depot_mg"] - absorbed)
+                pool["fat_mg"] = max(0.0, pool["fat_mg"] + to_fat - from_fat)
+                pool["central_mg"] = max(0.0, pool["central_mg"] + absorbed + from_fat - eliminated - to_fat)
 
                 # 对齐 Bateman 的物理现实公式 (mg -> pg, L -> mL)
-                euler_conc = (central_mg * 1000000.0) / (user_weight * vd)
+                euler_conc += (pool["central_mg"] * 1000000.0) / (user_weight * max(vd, 0.1))
 
             # 单室模型
             if current_t >= start_sim:

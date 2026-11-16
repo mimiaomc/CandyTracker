@@ -23,6 +23,11 @@
             <child>
               <object class="AdwPreferencesGroup">
                 <child>
+                  <object class="AdwEntryRow" id="creator_id_row">
+                    <property name="title" translatable="yes">Unique Identifier (a-z, 0-9, _)</property>
+                  </object>
+                </child>
+                <child>
                   <object class="AdwEntryRow" id="creator_name_row">
                     <property name="title" translatable="yes">Medication Name</property>
                   </object>

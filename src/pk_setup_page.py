@@ -49,7 +49,7 @@ class PkSetupPage(Adw.NavigationPage):
         self.spin_k_elim.set_adjustment(Gtk.Adjustment(value=0.15, lower=0.001, upper=10.0, step_increment=0.001))
         self.spin_k_cf.set_adjustment(Gtk.Adjustment(value=0.08, lower=0.001, upper=10.0, step_increment=0.001))
         self.spin_k_fc.set_adjustment(Gtk.Adjustment(value=0.01, lower=0.001, upper=10.0, step_increment=0.001))
-        self.spin_vd.set_adjustment(Gtk.Adjustment(value=1.5, lower=1.0, upper=500.0, step_increment=1.0))
+        self.spin_vd.set_adjustment(Gtk.Adjustment(value=19.0, lower=1.0, upper=500.0, step_increment=0.5))
 
         self.spin_patch_wear.set_adjustment(Gtk.Adjustment(value=84.0, lower=1.0, upper=500.0, step_increment=1.0))
         self.spin_patch_rate.set_adjustment(Gtk.Adjustment(value=50.0, lower=1.0, upper=5000.0, step_increment=5.0))
@@ -91,7 +91,7 @@ class PkSetupPage(Adw.NavigationPage):
         self.spin_k_elim.set_value(float(self.pk_data_ref.get("k_elim", 0.15)))
         self.spin_k_cf.set_value(float(self.pk_data_ref.get("k_cf", 0.08)))
         self.spin_k_fc.set_value(float(self.pk_data_ref.get("k_fc", 0.015)))
-        self.spin_vd.set_value(float(self.pk_data_ref.get("vd", 1.5)))
+        self.spin_vd.set_value(float(self.pk_data_ref.get("vd", 19.0)))
         
         # 填入贴片数据
         self.spin_patch_wear.set_value(float(self.pk_data_ref.get("wear_hours", 84.0)))
